@@ -22,22 +22,13 @@ def cargar_reservas():
             return pd.DataFrame(data)
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
-    
     return pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
 
 def guardar_reservas_en_nube(df):
     try:
         registros = df.to_dict(orient='records')
-        payload = {
-            "action": "save", 
-            "reservas": registros
-        }
-        requests.post(
-            URL_APPS_SCRIPT, 
-            data=json.dumps(payload), 
-            headers={'Content-Type': 'application/json'}, 
-            timeout=10
-        )
+        payload = {"action": "save", "reservas": registros}
+        requests.post(URL_APPS_SCRIPT, data=json.dumps(payload), headers={'Content-Type': 'application/json'}, timeout=10)
         return True
     except:
         return False
@@ -45,13 +36,10 @@ def guardar_reservas_en_nube(df):
 # --- VARIABLES DE ESTADO ---
 if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
-
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
-
 if "mostrar_exito" not in st.session_state:
     st.session_state.mostrar_exito = False
-
 if "reservas" not in st.session_state or st.session_state.reservas.empty:
     st.session_state.reservas = cargar_reservas()
 
@@ -64,16 +52,9 @@ str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime
 
 formulario_cerrado = False 
 
-dias = [
-    "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"
-]
-horas = [
-    "08:00 am - 09:50 am", "11:00 am - 12:50 pm", 
-    "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"
-]
-ambientes_opciones = [
-    "Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"
-]
+dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
+horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"]
+ambientes_opciones = ["Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"]
 equipos_opciones = [
     "Ningún Equipo en particular", "NH TD5.80", "NH TD5.100", "NH TD90", "JD 3050B", 
     "JD 1040", "NH B110B", "NH L223", "SOLD ELECTRODO MANUAL", "SOLD OXI", 
@@ -108,14 +89,26 @@ st.markdown("""
     
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
-    
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
     
     .tarjeta-fluido { background-color: white; padding: 15px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; border-bottom: 5px solid #006b3f; margin-bottom: 10px;}
     .icono-fluido { font-size: 40px; margin-bottom: 5px; }
-    .valor-fluido { font-size: 26px; font-weight: bold; color: #2c3e50; margin: 0; }
-    .titulo-fluido { font-size: 13px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
+    .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
+    .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
+    
+    /* Barra Superior Tabs Admin */
+    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #f0f2f6;
+        border-radius: 8px 8px 0px 0px;
+        padding: 10px 20px;
+        font-weight: bold;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #006b3f !important;
+        color: white !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -125,12 +118,12 @@ st.sidebar.markdown("Sistema Oficial de Separación.")
 st.sidebar.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
 if st.session_state.admin_mode:
-    st.sidebar.success("✅ Modo Admin")
+    st.sidebar.success("✅ Modo Admin Activo")
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.admin_mode = False
         st.rerun()
 else:
-    with st.sidebar.expander("🔑 Acceso"):
+    with st.sidebar.expander("🔑 Acceso Administrador"):
         clave = st.text_input("Contraseña", type="password")
         if st.button("Entrar") and clave == "orellana2026":
             st.session_state.admin_mode = True
@@ -140,136 +133,194 @@ else:
 # VISTA 1: ADMINISTRADOR
 # ==========================================
 if st.session_state.admin_mode:
-    st.title("⚙️ Panel de Administración")
+    st.title("⚙️ Panel de Control Administrativo")
     
-    opciones_menu_admin = [
+    # Barra de navegación horizontal superior con pestañas
+    tab_maquinaria, tab_reservas, tab_horario = st.tabs([
         "🚜 Control Visual de Maquinaria", 
         "🗑️ Gestionar Reservas", 
         "🖨️ Exportar Horario"
-    ]
-    opcion_admin = st.radio("Seleccione el módulo:", opciones_menu_admin)
-    st.markdown("---")
+    ])
     
-    if opcion_admin == "🚜 Control Visual de Maquinaria":
+    with tab_maquinaria:
         st.subheader("Estado Analítico e Historial de Maquinaria")
         sheet_id = "13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM"
         csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=58572181"
         
         try:
-            df_excel = pd.read_csv(csv_url)
-            df_excel.columns = df_excel.columns.str.strip()
+            # Leer el archivo con cabecera en la fila de fechas reales
+            df_crudo = pd.read_csv(csv_url, header=None)
             
-            def encontrar_columna(df, opciones):
-                for col in df.columns:
-                    col_limpia = str(col).upper().replace('Á','A').replace('Ó','O').strip()
-                    opciones_limpias = [opt.upper().replace('Á','A').replace('Ó','O').strip() for opt in opciones]
-                    if col_limpia in opciones_limpias: 
-                        return col
-                return None
+            # Buscar fila que contiene 'Tipo de Tractor' o 'Registro'
+            fila_encabezado = 0
+            for idx, fila in df_crudo.iterrows():
+                textos = [str(x).strip().lower() for x in fila.values]
+                if any("tipo de tractor" in t for t in textos) or any("registro" in t for t in textos):
+                    fila_encabezado = idx
+                    break
             
-            col_maq = encontrar_columna(df_excel, ['Máquina', 'Maquina', 'Equipo', 'Tractor', 'Tipo de Tractor'])
-            col_fecha = encontrar_columna(df_excel, ['Fecha', 'Marca temporal', 'Timestamp', 'Día', 'Registro'])
+            # Reasignar columnas: fila_encabezado tiene Tractor, Registro, UN, y fila siguiente las fechas
+            fila_cols = df_crudo.iloc[fila_encabezado].copy()
+            fila_fechas = df_crudo.iloc[fila_encabezado + 1] if (fila_encabezado + 1) < len(df_crudo) else fila_cols
             
-            if not col_maq and len(df_excel.columns) > 0: 
-                col_maq = df_excel.columns[0]
+            columnas_finales = []
+            for col_i in range(len(fila_cols)):
+                val_c = str(fila_cols[col_i]).strip()
+                val_f = str(fila_fechas[col_i]).strip()
+                if col_i == 0:
+                    columnas_finales.append("Tractor")
+                elif col_i == 1:
+                    columnas_finales.append("Registro")
+                elif col_i == 2:
+                    columnas_finales.append("UN")
+                else:
+                    nombre_fecha = val_f if val_f and val_f != "nan" else val_c
+                    columnas_finales.append(nombre_fecha)
+            
+            df_datos = df_crudo.iloc[fila_encabezado + 2:].copy()
+            df_datos.columns = columnas_finales
+            
+            # Llenar nombres de tractores hacia abajo (descombinar celdas)
+            df_datos["Tractor"] = df_datos["Tractor"].replace("", None).ffill()
+            df_datos = df_datos.dropna(subset=["Registro"])
+            df_datos["Registro"] = df_datos["Registro"].astype(str).str.strip().str.lower()
+            
+            tractores = df_datos["Tractor"].dropna().unique().tolist()
+            
+            if tractores:
+                tractor_sel = st.selectbox("🚜 Seleccione el equipo para inspeccionar:", tractores)
+                df_trac = df_datos[df_datos["Tractor"] == tractor_sel].copy()
                 
-            if col_maq:
-                maquinas_disponibles = df_excel[col_maq].dropna().unique()
-                maquina_sel = st.selectbox("🚜 Seleccione el equipo para inspeccionar:", maquinas_disponibles)
+                # Columnas de fechas (todas las columnas después de UN)
+                cols_fechas = [c for c in df_datos.columns if c not in ["Tractor", "Registro", "UN"]]
                 
-                df_maq = df_excel[df_excel[col_maq] == maquina_sel].copy()
-                
-                if col_fecha:
-                    df_maq[col_fecha] = pd.to_datetime(df_maq[col_fecha], errors='coerce')
-                    df_maq = df_maq.sort_values(by=col_fecha)
-                
-                datos_maq_actual = df_maq.iloc[-1]
-                
-                def limpiar_num(valor, default):
-                    if pd.isna(valor): return default
-                    try: return float(str(valor).replace('%', '').strip())
-                    except: return default
+                # Función para traducir 'max', '3/4 - max', etc. a porcentaje numérico
+                def mapear_nivel(val):
+                    if pd.isna(val): return 0.0
+                    txt = str(val).strip().lower()
+                    if txt == "max": return 100.0
+                    if "3/4" in txt and "max" in txt: return 87.5
+                    if txt == "3/4": return 75.0
+                    if "2/4" in txt and "3/4" in txt: return 62.5
+                    if txt in ["2/4", "1/2"]: return 50.0
+                    if "1/4" in txt and "2/4" in txt: return 37.5
+                    if txt == "1/4": return 25.0
+                    if txt == "min": return 15.0
+                    try:
+                        return float(txt.replace('%', '').replace(',', ''))
+                    except:
+                        return 0.0
 
-                col_comb = encontrar_columna(df_excel, ['Combustible', 'Gasolina', 'Petroleo', 'Diesel'])
-                col_refri = encontrar_columna(df_excel, ['Refrigerante', 'Agua'])
-                col_aceite_m = encontrar_columna(df_excel, ['Aceite', 'Aceite Motor', 'Motor'])
-                col_aceite_h = encontrar_columna(df_excel, ['Hidráulico', 'Aceite Hidraulico', 'Hidraulico'])
-                col_horo = encontrar_columna(df_excel, ['Horómetro', 'Horometro', 'Horas', 'Reloj'])
+                ultima_col_fecha = cols_fechas[-1] if cols_fechas else None
+                
+                def obtener_valor_actual(parametro):
+                    fila = df_trac[df_trac["Registro"].str.contains(parametro, na=False)]
+                    if not fila.empty and ultima_col_fecha:
+                        v = fila[ultima_col_fecha].values[0]
+                        return str(v)
+                    return "Sin dato"
 
-                val_comb = limpiar_num(datos_maq_actual[col_comb] if col_comb else None, 0)
-                val_refri = limpiar_num(datos_maq_actual[col_refri] if col_refri else None, 0)
-                val_aceite_m = limpiar_num(datos_maq_actual[col_aceite_m] if col_aceite_m else None, 0)
-                val_aceite_h = limpiar_num(datos_maq_actual[col_aceite_h] if col_aceite_h else None, 0)
-                val_horo = str(datos_maq_actual[col_horo]) if col_horo and not pd.isna(datos_maq_actual[col_horo]) else "0"
+                comb_txt = obtener_valor_actual("combustible")
+                refri_txt = obtener_valor_actual("refrigerante")
+                aceite_m_txt = obtener_valor_actual("aceite de motor")
+                aceite_h_txt = obtener_valor_actual("hidráulico")
+                horo_txt = obtener_valor_actual("horometro")
+                if horo_txt == "Sin dato":
+                    horo_txt = obtener_valor_actual("horómetro")
 
-                st.markdown(f"### 📌 Nivel Actual: {maquina_sel}")
+                val_comb = mapear_nivel(comb_txt)
+                val_refri = mapear_nivel(refri_txt)
+                val_aceite_m = mapear_nivel(aceite_m_txt)
+                val_aceite_h = mapear_nivel(aceite_h_txt)
+                
+                fecha_etiqueta = f" ({ultima_col_fecha})" if ultima_col_fecha else ""
+                st.markdown(f"### 📌 Nivel Más Reciente: **{tractor_sel}**{fecha_etiqueta}")
                 
                 c1, c2, c3, c4, c5 = st.columns(5)
                 
                 with c1:
-                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">⛽</div><div class="titulo-fluido">Combustible</div><p class="valor-fluido">{int(val_comb)}%</p></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">⛽</div><div class="titulo-fluido">Combustible</div><p class="valor-fluido">{comb_txt}</p></div>""", unsafe_allow_html=True)
                     st.progress(min(max(int(val_comb), 0), 100) / 100)
 
                 with c2:
-                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">🏺</div><div class="titulo-fluido">Refrigerante</div><p class="valor-fluido">{int(val_refri)}%</p></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">🏺</div><div class="titulo-fluido">Refrigerante</div><p class="valor-fluido">{refri_txt}</p></div>""", unsafe_allow_html=True)
                     st.progress(min(max(int(val_refri), 0), 100) / 100)
 
                 with c3:
-                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">🛢️</div><div class="titulo-fluido">A. Motor</div><p class="valor-fluido">{int(val_aceite_m)}%</p></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">🛢️</div><div class="titulo-fluido">A. Motor</div><p class="valor-fluido">{aceite_m_txt}</p></div>""", unsafe_allow_html=True)
                     st.progress(min(max(int(val_aceite_m), 0), 100) / 100)
                     
                 with c4:
-                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">⚙️</div><div class="titulo-fluido">A. Hidráulico</div><p class="valor-fluido">{int(val_aceite_h)}%</p></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">⚙️</div><div class="titulo-fluido">A. Hidráulico</div><p class="valor-fluido">{aceite_h_txt}</p></div>""", unsafe_allow_html=True)
                     st.progress(min(max(int(val_aceite_h), 0), 100) / 100)
 
                 with c5:
-                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">⏱️</div><div class="titulo-fluido">Horómetro</div><p class="valor-fluido" style="font-size:22px;">{val_horo} hrs</p></div>""", unsafe_allow_html=True)
+                    st.markdown(f"""<div class="tarjeta-fluido"><div class="icono-fluido">⏱️</div><div class="titulo-fluido">Horómetro</div><p class="valor-fluido">{horo_txt} <span style="font-size:16px;">hrs</span></p></div>""", unsafe_allow_html=True)
                 
                 st.markdown("---")
                 
-                st.markdown(f"### 📈 Análisis Histórico de Rendimiento")
-                if col_fecha:
-                    metrica_grafico = st.selectbox("Seleccione el indicador que desea graficar:", 
-                                                   ["Combustible", "Refrigerante", "Aceite de Motor", "Aceite Hidráulico", "Horómetro"])
-                    
-                    dict_columnas = {
-                        "Combustible": col_comb, "Refrigerante": col_refri, 
-                        "Aceite de Motor": col_aceite_m, "Aceite Hidráulico": col_aceite_h, 
-                        "Horómetro": col_horo
-                    }
-                    col_y = dict_columnas[metrica_grafico]
-                    
-                    if col_y:
-                        df_grafico = df_maq.copy()
-                        df_grafico[col_y] = pd.to_numeric(df_grafico[col_y].astype(str).str.replace('%','').str.replace(',',''), errors='coerce')
-                        
-                        # LÓGICA DOBLE PARA EL GRÁFICO
-                        if metrica_grafico == "Horómetro":
-                            # Gráfico de Área para el Horómetro (crecimiento acumulativo)
-                            fig = px.area(df_grafico, x=col_fecha, y=col_y, markers=True, 
-                                          title=f"Acumulación de Horas de Trabajo - {maquina_sel}")
-                            fig.update_traces(line_color="#ff5722", fillcolor="rgba(255, 87, 34, 0.2)", marker=dict(size=8, color="#006b3f"))
-                        else:
-                            # Gráfico de Líneas Curvas para Fluidos (picos y caídas)
-                            fig = px.line(df_grafico, x=col_fecha, y=col_y, markers=True, 
-                                          title=f"Evolución de {metrica_grafico} - {maquina_sel}",
-                                          line_shape="spline")
-                            fig.update_traces(line_color="#006b3f", marker=dict(size=8, color="#ff5722"))
-                            
-                        st.plotly_chart(fig, use_container_width=True)
-                    else:
-                        st.warning(f"No se encontró la columna de {metrica_grafico} en su Excel.")
-                else:
-                    st.info("💡 **Tip para el Gráfico:** Para ver la evolución en líneas, asegúrate de que tu Excel tenga una columna llamada 'Fecha' o 'Marca temporal' y guarda un historial de los reportes hacia abajo.")
+                # --- GRÁFICO HISTÓRICO CONVERTIDO DE HORIZONTAL A VERTICAL ---
+                st.markdown("### 📈 Análisis Histórico de Rendimiento")
                 
-                with st.expander("Ver historial completo de esta máquina"):
-                    st.dataframe(df_maq.tail(15), use_container_width=True)
+                metrica_grafico = st.selectbox(
+                    "Seleccione el indicador que desea graficar a lo largo de las fechas:", 
+                    ["Combustible", "Refrigerante", "Aceite de Motor", "Aceite Hidráulico", "Horómetro"]
+                )
+                
+                clave_param = {
+                    "Combustible": "combustible",
+                    "Refrigerante": "refrigerante",
+                    "Aceite de Motor": "aceite de motor",
+                    "Aceite Hidráulico": "hidráulico",
+                    "Horómetro": "horometro"
+                }[metrica_grafico]
+                
+                fila_metrica = df_trac[df_trac["Registro"].str.contains(clave_param, na=False)]
+                
+                if not fila_metrica.empty and cols_fechas:
+                    valores_temporales = []
+                    for f in cols_fechas:
+                        val_crudo = fila_metrica[f].values[0]
+                        if metrica_grafico == "Horómetro":
+                            try:
+                                v_num = float(str(val_crudo).replace(',', ''))
+                            except:
+                                v_num = None
+                        else:
+                            v_num = mapear_nivel(val_crudo)
+                        valores_temporales.append({"Fecha": f, "Valor": v_num, "Texto": str(val_crudo)})
+                    
+                    df_historico_plot = pd.DataFrame(valores_temporales)
+                    
+                    if metrica_grafico == "Horómetro":
+                        fig = px.area(
+                            df_historico_plot, x="Fecha", y="Valor", markers=True, 
+                            title=f"Horómetro Acumulado (hrs) - {tractor_sel}",
+                            hover_data={"Texto": True, "Valor": False}
+                        )
+                        fig.update_traces(line_color="#ff5722", fillcolor="rgba(255, 87, 34, 0.25)", marker=dict(size=8, color="#006b3f"))
+                    else:
+                        fig = px.line(
+                            df_historico_plot, x="Fecha", y="Valor", markers=True, 
+                            title=f"Evolución de {metrica_grafico} (%) - {tractor_sel}",
+                            hover_data={"Texto": True, "Valor": True},
+                            line_shape="spline"
+                        )
+                        fig.update_traces(line_color="#006b3f", marker=dict(size=8, color="#ff5722"))
+                        fig.update_layout(yaxis=dict(range=[0, 105], title="Nivel Estimado (%)"))
+                        
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning(f"No se registraron datos para {metrica_grafico} en este equipo.")
+                
+                with st.expander("Ver tabla completa de este equipo"):
+                    st.dataframe(df_trac, use_container_width=True)
             else:
-                st.error("No se encontró ninguna columna válida en el Excel para identificar las máquinas.")
+                st.error("No se encontraron nombres de tractores en el archivo.")
         except Exception as e:
-            st.error(f"⚠️ No se pudo cargar el Excel de Registro. Revisa los permisos en Drive o el formato. Detalle: {e}")
+            st.error(f"⚠️ Error procesando la hoja de registros: {e}")
             
-    elif opcion_admin == "🗑️ Gestionar Reservas":
+    with tab_reservas:
         st.subheader("Borrador de Reservas Activas")
         st.write("Marca la casilla '❌ Borrar' en las filas que desees eliminar y presiona el botón inferior para borrar de la nube.")
         
@@ -285,7 +336,7 @@ if st.session_state.admin_mode:
                 time.sleep(2)
                 st.rerun()
             
-    elif opcion_admin == "🖨️ Exportar Horario":
+    with tab_horario:
         st.subheader(f"Generar Horario Coloreado para PDF ({str_semana})")
         
         html_table = f"""
@@ -421,8 +472,8 @@ else:
                             "Horario": h, 
                             "Profesor": profesor, 
                             "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
-                            "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)",
-                            "Materiales": m_sel if m_sel else "(Ninguno)",
+                            "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)", 
+                            "Materiales": m_sel if m_sel else "(Ninguno)", 
                             "List_Amb": a_sel, 
                             "List_Eq": e_sel
                         })
