@@ -30,20 +30,17 @@ if "reservas" not in st.session_state:
 if "mostrar_exito" not in st.session_state:
     st.session_state.mostrar_exito = False
 
-# Cálculos de Tiempo (Hora de Lima)
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
 dia_semana = ahora.weekday() 
 hora = ahora.hour
 
-# Determinar las fechas de la "Próxima Semana"
 dias_para_lunes = 7 - dia_semana
 lunes_obj = ahora + timedelta(days=dias_para_lunes)
 viernes_obj = lunes_obj + timedelta(days=4)
 str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime('%d/%m')}"
 
 formulario_cerrado = False 
-# Descomentar para activar bloqueo real:
 # if (dia_semana == 3 and hora >= 22) or (dia_semana == 4 and hora < 8):
 #     formulario_cerrado = True
 
@@ -111,7 +108,6 @@ if st.session_state.admin_mode:
     elif opcion_admin == "🗑️ Gestionar Reservas":
         st.subheader("Borrador de Reservas Activas")
         st.write("Marca la casilla '❌ Borrar' en las filas que desees eliminar y presiona el botón inferior.")
-        
         df_admin = st.session_state.reservas.copy()
         df_admin.insert(0, "❌ Borrar", False)
         df_editado = st.data_editor(df_admin, hide_index=True, use_container_width=True)
@@ -137,7 +133,6 @@ if st.session_state.admin_mode:
         """
         for d in dias: html_table += f"<th>{d}</th>"
         html_table += "</tr>"
-        
         for h in horas:
             html_table += f"<tr><td class='hora'>{h}</td>"
             for d in dias:
@@ -164,7 +159,7 @@ if st.session_state.admin_mode:
 else:
     if st.session_state.mostrar_exito:
         st.balloons()
-        st.success("🎉 ¡EXITO! Su separación de ambientes y equipos ha sido procesada y registrada en el cronograma. Ya puede cerrar esta página.")
+        st.success("✅ ¡Guardado satisfactoriamente! El formulario se ha reiniciado y está listo para otra separación.")
         st.session_state.mostrar_exito = False
 
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
@@ -174,7 +169,6 @@ else:
     else:
         st.info(f"✅ **SISTEMA ABIERTO.** Actualmente está separando recursos para la **{str_semana}**.")
         
-        # MATRIZ BASE (Se calculará para mostrar disponibilidad)
         st.subheader("📊 Recursos Ocupados en Tiempo Real")
         matriz = pd.DataFrame(index=horas, columns=dias)
         matriz.fillna("🟢 Libre", inplace=True)
@@ -222,29 +216,24 @@ else:
                         })
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # --- 3. PREVISUALIZACIÓN UNIFICADA (ROJO VS AZUL) ---
             if reservas_temporales:
                 st.markdown("---")
                 st.markdown("### 👁️ Previsualización de su Horario")
                 st.info("Verifique su horario. Lo reservado por otros aparece en ROJO. Su separación actual resalta en AZUL.")
                 
-                df_horario_visual = matriz.copy() # Tomamos la matriz real como base
+                df_horario_visual = matriz.copy()
                 
                 for res in reservas_temporales:
                     texto_celda_azul = f"🔵 SU SELECCIÓN:\nAmb: {res['Ambientes']}\nEq: {res['Equipos']}"
                     actual = df_horario_visual.at[res["Horario"], res["Día"]]
                     
-                    # Si el casillero estaba libre, solo ponemos lo azul
                     if "🟢" in str(actual):
                         df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda_azul
-                    # Si el casillero ya tenía algo separado por otros (🔴), mostramos AMBOS para que vea cómo comparten el bloque
                     else:
                         df_horario_visual.at[res["Horario"], res["Día"]] = str(actual) + "\n\n" + texto_celda_azul
                     
-                # Usamos table porque respeta muy bien los saltos de línea (\n)
                 st.table(df_horario_visual)
                 
-                # BOTÓN DE CONFIRMACIÓN
                 if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
                     cruces = []
                     for res in reservas_temporales:
