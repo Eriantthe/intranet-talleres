@@ -17,11 +17,9 @@ st.markdown("""
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
     div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
     
-    /* Contenedor principal del Día */
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
     
-    /* Sub-contenedor para cada Hora específica */
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
     </style>
@@ -39,7 +37,10 @@ ahora = datetime.now(tz_lima)
 formulario_cerrado = False 
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-horas = ["08:00 am - 09:00 am", "09:00 am - 10:45 am", "11:00 am - 12:00 pm", "12:00 pm - 12:45 pm", "02:00 pm - 03:00 pm", "03:00 pm - 03:50 pm"]
+
+# NUEVOS BLOQUES HORARIOS ACADÉMICOS
+horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"]
+
 ambientes_opciones = ["Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"]
 equipos_opciones = ["Ningún Equipo en particular", "NH TD5.80", "NH TD5.100", "NH TD90", "JD 3050B", "JD 1040", "NH B110B", "NH L223", "SOLD ELECTRODO MANUAL", "SOLD OXI", "SOLD TIG", "SOLD MIG/MAG", "TORNO", "FRESADORA", "ESMERIL", "PRENSA HIDRAULICA", "REMACHADORA", "FRAGUA", "MAQUETA MOTOR"]
 
@@ -97,7 +98,6 @@ else:
     else:
         st.info("✅ **SISTEMA ABIERTO.** Siga los pasos para separar sus requerimientos de la próxima semana.")
         
-        # MATRIZ MAIPI GENERAL
         st.subheader("📊 Disponibilidad en Tiempo Real")
         matriz = pd.DataFrame(index=horas, columns=dias)
         matriz.fillna("🟢 Libre", inplace=True)
@@ -106,7 +106,6 @@ else:
         st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
         
-        # --- FORMULARIO CASCADA (DÍA -> HORA -> DETALLES) ---
         st.subheader("📝 Registrar Separación")
         
         profesor = st.selectbox("Docente Responsable", [
@@ -126,10 +125,8 @@ else:
             for d in dias_sel:
                 st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()}</div>', unsafe_allow_html=True)
                 
-                # Seleccionar las horas para este día
                 h_sel = st.multiselect(f"⏰ Seleccione los horarios que utilizará el {d}:", horas, key=f"h_{d}")
                 
-                # Si el usuario eligió horas, creamos un bloque de detalles por CADA hora
                 if h_sel:
                     for h in h_sel:
                         st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Requerimientos para el bloque: {h}</div>', unsafe_allow_html=True)
@@ -142,7 +139,7 @@ else:
                         
                         m_sel = st.text_input(f"🛠️ Materiales extra", placeholder="Ej. Sembradoras...", key=f"m_{d}_{h}")
                         
-                        st.markdown('</div>', unsafe_allow_html=True) # Cierra el bloque de hora
+                        st.markdown('</div>', unsafe_allow_html=True)
                         
                         reservas_temporales.append({
                             "Día": d, "Horario": h, "Profesor": profesor.split(" ")[1], 
@@ -151,9 +148,8 @@ else:
                             "Materiales": m_sel if m_sel else "(Ninguno)"
                         })
                 
-                st.markdown('</div>', unsafe_allow_html=True) # Cierra el bloque del día
+                st.markdown('</div>', unsafe_allow_html=True)
             
-            # --- 3. PREVISUALIZACIÓN TIPO HORARIO REAL ---
             if reservas_temporales:
                 st.markdown("---")
                 st.markdown("### 👁️ Previsualización de su Horario")
@@ -168,7 +164,6 @@ else:
                     
                 st.table(df_horario_visual)
                 
-                # BOTÓN DE CONFIRMACIÓN
                 if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
                     cruces = []
                     for res in reservas_temporales:
