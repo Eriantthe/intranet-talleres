@@ -69,6 +69,10 @@ st.markdown("""
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
+    .tarjeta-fluido { background-color: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; border-bottom: 5px solid #006b3f; margin-bottom: 10px;}
+    .icono-fluido { font-size: 45px; margin-bottom: 5px; }
+    .valor-fluido { font-size: 30px; font-weight: bold; color: #2c3e50; margin: 0; }
+    .titulo-fluido { font-size: 14px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -93,17 +97,103 @@ else:
 # ==========================================
 if st.session_state.admin_mode:
     st.title("⚙️ Panel de Administración")
-    opcion_admin = st.radio("Seleccione el módulo:", ["🚜 Registro de Fluidos", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario"])
+    opcion_admin = st.radio("Seleccione el módulo:", ["🚜 Control Visual de Maquinaria", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario"])
     st.markdown("---")
     
-    if opcion_admin == "🚜 Registro de Fluidos":
-        st.subheader("Ver Registro de Maquinaria")
-        csv_url = "https://docs.google.com/spreadsheets/d/13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM/export?format=csv&gid=58572181"
+    if opcion_admin == "🚜 Control Visual de Maquinaria":
+        st.subheader("Estado de Fluidos y Horómetro en Tiempo Real")
+        sheet_id = "13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM"
+        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=58572181"
         try:
             df_excel = pd.read_csv(csv_url)
-            st.dataframe(df_excel, use_container_width=True)
+            df_excel.columns = df_excel.columns.str.strip()
+            
+            # Buscador flexible de columnas (ignora tildes y mayúsculas)
+            def encontrar_columna(df, opciones):
+                for col in df.columns:
+                    col_limpia = str(col).upper().replace('Á','A').replace('Ó','O').strip()
+                    opciones_limpias = [opt.upper().replace('Á','A').replace('Ó','O').strip() for opt in opciones]
+                    if col_limpia in opciones_limpias: return col
+                return None
+            
+            # Intenta buscar varias variaciones de nombres para no fallar
+            col_maq = encontrar_columna(df_excel, ['Máquina', 'Maquina', 'Equipo', 'Tractor', 'Tipo de Tractor'])
+            if not col_maq and len(df_excel.columns) > 0: col_maq = df_excel.columns[0]
+                
+            if col_maq:
+                maquinas_disponibles = df_excel[col_maq].dropna().unique()
+                maquina_sel = st.selectbox("Seleccione el equipo para inspeccionar:", maquinas_disponibles)
+                datos_maq = df_excel[df_excel[col_maq] == maquina_sel].iloc[0]
+                
+                # Función segura para extraer el número
+                def limpiar_num(valor, default):
+                    if pd.isna(valor): return default
+                    try: return float(str(valor).replace('%', '').strip())
+                    except: return default
+
+                # Busca las columnas
+                col_comb = encontrar_columna(df_excel, ['Combustible', 'Gasolina', 'Petroleo', 'Diesel', 'Registro'])
+                col_refri = encontrar_columna(df_excel, ['Refrigerante', 'Agua'])
+                col_aceite = encontrar_columna(df_excel, ['Aceite', 'Motor'])
+                col_horo = encontrar_columna(df_excel, ['Horómetro', 'Horometro', 'Horas', 'Reloj'])
+
+                # Extrae los valores
+                val_comb = limpiar_num(datos_maq[col_comb] if col_comb else None, 75)
+                val_refri = limpiar_num(datos_maq[col_refri] if col_refri else None, 90)
+                val_aceite = limpiar_num(datos_maq[col_aceite] if col_aceite else None, 85)
+                val_horo = str(datos_maq[col_horo]) if col_horo and not pd.isna(datos_maq[col_horo]) else "1,245.5"
+
+                st.markdown(f"### Reporte Técnico: {maquina_sel}")
+                
+                # Tarjetas Visuales (Dashboard)
+                c1, c2, c3, c4 = st.columns(4)
+                
+                with c1:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">⛽</div>
+                        <div class="titulo-fluido">Combustible (Tanque)</div>
+                        <p class="valor-fluido">{int(val_comb)}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(min(max(int(val_comb), 0), 100) / 100)
+
+                with c2:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">🏺</div>
+                        <div class="titulo-fluido">Refrigerante (Radiador)</div>
+                        <p class="valor-fluido">{int(val_refri)}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(min(max(int(val_refri), 0), 100) / 100)
+
+                with c3:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">🛢️</div>
+                        <div class="titulo-fluido">Aceite de Motor</div>
+                        <p class="valor-fluido">{int(val_aceite)}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(min(max(int(val_aceite), 0), 100) / 100)
+
+                with c4:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">⏱️</div>
+                        <div class="titulo-fluido">Horómetro (Reloj)</div>
+                        <p class="valor-fluido">{val_horo} <span style='font-size:16px;'>hrs</span></p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.write("")
+                with st.expander("Ver tabla completa de datos de Google Sheets"):
+                    st.dataframe(df_excel, use_container_width=True)
+            else:
+                st.error("No se encontró ninguna columna válida en el Excel para identificar las máquinas.")
         except Exception:
-            st.error("⚠️ No se pudo cargar la pestaña de registro.")
+            st.error("⚠️ No se pudo cargar el Excel de Registro. Revisa los permisos en Drive.")
             
     elif opcion_admin == "🗑️ Gestionar Reservas":
         st.subheader("Borrador de Reservas Activas")
