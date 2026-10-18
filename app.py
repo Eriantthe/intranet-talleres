@@ -8,7 +8,7 @@ import requests
 import json
 
 # === PEGA TU ENLACE QUE TERMINA EN /exec AQUÍ ABAJO ===
-URL_APPS_SCRIPT = https://script.google.com/macros/s/AKfycbxihm1pF6Z3bJ5LaHIGTv8m-HFDEl1B3hgWemaeS4W4tWbwI0wGvbx6lF7YScjTWkOL/exec
+URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbxihm1pF6Z3bJ5LaHIGTv8m-HFDEl1B3hgWemaeS4W4tWbwI0wGvbx6lF7YScjTWkOL/exec"
 # ========================================================
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
