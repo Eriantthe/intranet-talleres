@@ -28,6 +28,8 @@ if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
 if "reservas" not in st.session_state:
     st.session_state.reservas = pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
+if "form_key" not in st.session_state:
+    st.session_state.form_key = 0 # Llave maestra para forzar el borrado del formulario
 
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
@@ -181,24 +183,26 @@ else:
         st.markdown("---")
         
         st.subheader("📝 Registrar Separación")
-        profesor = st.selectbox("Docente Responsable", profesores_lista)
         
-        dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias)
+        # Uso de form_key para asegurar que las opciones se limpian por completo tras guardar
+        profesor = st.selectbox("Docente Responsable", profesores_lista, key=f"prof_{st.session_state.form_key}")
+        
+        dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias, key=f"dias_main_{st.session_state.form_key}")
         reservas_temporales = []
         
         if dias_sel:
             st.markdown("##### 2. Requerimientos por Bloque Horario")
             for d in dias_sel:
                 st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()}</div>', unsafe_allow_html=True)
-                h_sel = st.multiselect(f"⏰ Seleccione los horarios para el {d}:", horas, key=f"h_{d}")
+                h_sel = st.multiselect(f"⏰ Seleccione los horarios para el {d}:", horas, key=f"h_{d}_{st.session_state.form_key}")
                 
                 if h_sel:
                     for h in h_sel:
                         st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
                         col_a, col_e = st.columns(2)
-                        with col_a: a_sel = st.multiselect(f"🏢 Ambientes", ambientes_opciones, key=f"a_{d}_{h}")
-                        with col_e: e_sel = st.multiselect(f"🚜 Equipos", equipos_opciones, key=f"e_{d}_{h}")
-                        m_sel = st.text_input(f"🛠️ Materiales extra", key=f"m_{d}_{h}")
+                        with col_a: a_sel = st.multiselect(f"🏢 Ambientes", ambientes_opciones, key=f"a_{d}_{h}_{st.session_state.form_key}")
+                        with col_e: e_sel = st.multiselect(f"🚜 Equipos", equipos_opciones, key=f"e_{d}_{h}_{st.session_state.form_key}")
+                        m_sel = st.text_input(f"🛠️ Materiales extra", key=f"m_{d}_{h}_{st.session_state.form_key}")
                         st.markdown('</div>', unsafe_allow_html=True)
                         
                         reservas_temporales.append({
@@ -227,6 +231,9 @@ else:
                         df_horario_visual.at[res["Horario"], res["Día"]] = str(actual) + "\n\n" + texto_celda_azul
                     
                 st.table(df_horario_visual)
+                
+                # Crear un espacio para el mensaje de éxito antes del botón
+                placeholder_exito = st.empty()
                 
                 if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
                     cruces = []
@@ -259,13 +266,14 @@ else:
                         
                         st.session_state.reservas = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
                         
-                        # Generar notificación flotante tipo pestaña
+                        # Mensajes visuales y notificación tipo pestaña
+                        st.balloons()
                         st.toast("✅ ¡Guardado satisfactoriamente!", icon="🎉")
+                        placeholder_exito.success("✅ ¡Guardado satisfactoriamente! La pantalla se limpiará automáticamente en 5 segundos.")
                         
-                        # Mostrar el mensaje directamente encima del botón
-                        st.success("✅ ¡Guardado satisfactoriamente! El formulario se reiniciará en unos segundos.")
+                        # Espera de 5 segundos para asegurar la lectura
+                        time.sleep(5)
                         
-                        # Esperar 2.5 segundos para que el usuario pueda leer el mensaje
-                        time.sleep(2.5)
-                        
+                        # Incrementar la llave maestra para destruir el formulario actual y forzar uno nuevo en blanco
+                        st.session_state.form_key += 1
                         st.rerun()
