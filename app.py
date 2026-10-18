@@ -8,7 +8,7 @@ import requests
 import json
 
 # === ENLACE OFICIAL DE LA BASE DE DATOS EN GOOGLE SHEETS ===
-URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbxihm1pF6Z3bJ5LaHIGTv8m-HFDEl1B3hgWemaeS4W4tWbwI0wGvbx6lF7YScjTWkOL/exec"
+URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycby4UvofIzgX5Xn0owmt2B--FDNTVQp748ezrJNh9hsWbM-ws25dSrxYlkAxwy6dFmkW/exec"
 # ========================================================
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
@@ -22,7 +22,7 @@ def cargar_reservas():
             return pd.DataFrame(data)
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
-    return pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
+    return pd.DataFrame(columns=["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
 
 def guardar_reservas_en_nube(df):
     try:
@@ -89,6 +89,7 @@ st.markdown("""
     
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
+    
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
     
@@ -135,7 +136,6 @@ else:
 if st.session_state.admin_mode:
     st.title("⚙️ Panel de Control Administrativo")
     
-    # Barra de navegación horizontal superior con pestañas
     tab_maquinaria, tab_reservas, tab_horario = st.tabs([
         "🚜 Control Visual de Maquinaria", 
         "🗑️ Gestionar Reservas", 
@@ -148,10 +148,8 @@ if st.session_state.admin_mode:
         csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=58572181"
         
         try:
-            # Leer el archivo con cabecera en la fila de fechas reales
             df_crudo = pd.read_csv(csv_url, header=None)
             
-            # Buscar fila que contiene 'Tipo de Tractor' o 'Registro'
             fila_encabezado = 0
             for idx, fila in df_crudo.iterrows():
                 textos = [str(x).strip().lower() for x in fila.values]
@@ -159,7 +157,6 @@ if st.session_state.admin_mode:
                     fila_encabezado = idx
                     break
             
-            # Reasignar columnas: fila_encabezado tiene Tractor, Registro, UN, y fila siguiente las fechas
             fila_cols = df_crudo.iloc[fila_encabezado].copy()
             fila_fechas = df_crudo.iloc[fila_encabezado + 1] if (fila_encabezado + 1) < len(df_crudo) else fila_cols
             
@@ -180,7 +177,6 @@ if st.session_state.admin_mode:
             df_datos = df_crudo.iloc[fila_encabezado + 2:].copy()
             df_datos.columns = columnas_finales
             
-            # Llenar nombres de tractores hacia abajo (descombinar celdas)
             df_datos["Tractor"] = df_datos["Tractor"].replace("", None).ffill()
             df_datos = df_datos.dropna(subset=["Registro"])
             df_datos["Registro"] = df_datos["Registro"].astype(str).str.strip().str.lower()
@@ -190,11 +186,8 @@ if st.session_state.admin_mode:
             if tractores:
                 tractor_sel = st.selectbox("🚜 Seleccione el equipo para inspeccionar:", tractores)
                 df_trac = df_datos[df_datos["Tractor"] == tractor_sel].copy()
-                
-                # Columnas de fechas (todas las columnas después de UN)
                 cols_fechas = [c for c in df_datos.columns if c not in ["Tractor", "Registro", "UN"]]
                 
-                # Función para traducir 'max', '3/4 - max', etc. a porcentaje numérico
                 def mapear_nivel(val):
                     if pd.isna(val): return 0.0
                     txt = str(val).strip().lower()
@@ -259,7 +252,7 @@ if st.session_state.admin_mode:
                 
                 st.markdown("---")
                 
-                # --- GRÁFICO HISTÓRICO CONVERTIDO DE HORIZONTAL A VERTICAL ---
+                # --- GRÁFICO HISTÓRICO ---
                 st.markdown("### 📈 Análisis Histórico de Rendimiento")
                 
                 metrica_grafico = st.selectbox(
@@ -325,6 +318,10 @@ if st.session_state.admin_mode:
         st.write("Marca la casilla '❌ Borrar' en las filas que desees eliminar y presiona el botón inferior para borrar de la nube.")
         
         df_admin = st.session_state.reservas.copy()
+        columnas_orden = ["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"]
+        columnas_presentes = [c for c in columnas_orden if c in df_admin.columns]
+        df_admin = df_admin[columnas_presentes]
+        
         df_admin.insert(0, "❌ Borrar", False)
         df_editado = st.data_editor(df_admin, hide_index=True, use_container_width=True)
         
@@ -366,7 +363,8 @@ if st.session_state.admin_mode:
                     for _, r in reserva.iterrows():
                         prof = r["Profesor"]
                         bg_color = colores_prof.get(prof, "#ffffff")
-                        contenido += f"<b>{prof}</b><br><i>Amb.:</i> {r['Ambientes']}<br><i>Eq.:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
+                        fecha_reg = f"<small style='color:#555;'>({r.get('Fecha/Hora Registro', '')})</small><br>" if r.get('Fecha/Hora Registro', '') else ""
+                        contenido += f"<b>{prof}</b><br>{fecha_reg}<i>Amb.:</i> {r['Ambientes']}<br><i>Eq.:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
                     html_table += f"<td style='background-color: {bg_color};'>{contenido}</td>"
                 else:
                     html_table += "<td></td>"
@@ -467,7 +465,10 @@ else:
                         )
                         st.markdown('</div>', unsafe_allow_html=True)
                         
+                        timestamp_actual = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
+                        
                         reservas_temporales.append({
+                            "Fecha/Hora Registro": timestamp_actual,
                             "Día": d, 
                             "Horario": h, 
                             "Profesor": profesor, 
@@ -512,8 +513,8 @@ else:
                             actuales_dh = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
                             
                             for _, act in actuales_dh.iterrows():
-                                amb_act = set([a.strip() for a in act["Ambientes"].split(",") if a.strip() and a.strip() != "(Ninguno)"])
-                                eq_act = set([e.strip() for e in act["Equipos"].split(",") if e.strip() and e.strip() != "(Ninguno)"])
+                                amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
+                                eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
                                 
                                 cruce_amb = [a for a in amb_nuevos if a in amb_act and a != "Campo"]
                                 cruce_eq = [e for e in eq_nuevos if e in eq_act and e != "Ningún Equipo en particular"]
@@ -529,7 +530,9 @@ else:
                         if cruces:
                             st.error(f"⚠️ **Cruce detectado:** Otros docentes acaban de separar estos recursos: {', '.join(cruces)}. Por favor actualice la página.")
                         else:
+                            timestamp_envio = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
                             for r in reservas_temporales:
+                                r["Fecha/Hora Registro"] = timestamp_envio
                                 del r["List_Amb"]
                                 del r["List_Eq"]
                             
