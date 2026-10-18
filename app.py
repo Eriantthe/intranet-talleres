@@ -7,7 +7,7 @@ import time
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
 
-# --- 1. ESTILO VISUAL Y TARJETAS INTERACTIVAS ---
+# --- 1. ESTILO VISUAL ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #006b3f !important; }
@@ -21,7 +21,6 @@ st.markdown("""
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
     
-    /* Diseño de las Tarjetas Visuales de Fluidos */
     .tarjeta-fluido {
         background-color: white; padding: 20px; border-radius: 15px; 
         box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; 
@@ -108,27 +107,47 @@ if st.session_state.admin_mode:
         
         try:
             df_excel = pd.read_csv(csv_url)
+            # Limpiar espacios invisibles en los nombres de las columnas
+            df_excel.columns = df_excel.columns.str.strip()
             
-            if 'Máquina' in df_excel.columns:
-                # 1. Selector interactivo de Máquina
-                maquina_sel = st.selectbox("Seleccione el equipo para inspeccionar:", df_excel['Máquina'].unique())
-                datos_maq = df_excel[df_excel['Máquina'] == maquina_sel].iloc[0]
+            # Buscador flexible de columnas (ignora tildes y mayúsculas)
+            def encontrar_columna(df, opciones):
+                for col in df.columns:
+                    col_limpia = col.upper().replace('Á','A').replace('Ó','O').strip()
+                    opciones_limpias = [opt.upper().replace('Á','A').replace('Ó','O').strip() for opt in opciones]
+                    if col_limpia in opciones_limpias:
+                        return col
+                return None
+            
+            # Encontrar columnas clave
+            col_maq = encontrar_columna(df_excel, ['Máquina', 'Maquina', 'Equipo', 'Tractor'])
+            if not col_maq and len(df_excel.columns) > 0:
+                col_maq = df_excel.columns[0] # Usa la primera columna si no encuentra el nombre exacto
                 
-                # Función segura para extraer el número (por si tiene el símbolo % en el excel)
+            if col_maq:
+                maquina_sel = st.selectbox("Seleccione el equipo para inspeccionar:", df_excel[col_maq].dropna().unique())
+                datos_maq = df_excel[df_excel[col_maq] == maquina_sel].iloc[0]
+                
+                # Función para extraer números seguros
                 def limpiar_num(valor, default):
                     if pd.isna(valor): return default
                     try: return float(str(valor).replace('%', '').strip())
                     except: return default
 
-                # Extraer datos reales del Excel o usar valores de prueba si la columna no existe aún
-                val_comb = limpiar_num(datos_maq.get('Combustible', 75), 75)
-                val_refri = limpiar_num(datos_maq.get('Refrigerante', 90), 90)
-                val_aceite = limpiar_num(datos_maq.get('Aceite', 85), 85)
-                val_horo = datos_maq.get('Horómetro', "1,245.5") if 'Horómetro' in datos_maq else "1,245.5"
+                # Buscar columnas de fluidos
+                col_comb = encontrar_columna(df_excel, ['Combustible', 'Gasolina', 'Petroleo', 'Diesel'])
+                col_refri = encontrar_columna(df_excel, ['Refrigerante', 'Agua'])
+                col_aceite = encontrar_columna(df_excel, ['Aceite', 'Motor'])
+                col_horo = encontrar_columna(df_excel, ['Horómetro', 'Horometro', 'Horas', 'Reloj'])
+
+                # Extraer valores (o usar predeterminados visuales si aún no creas las columnas en tu Excel)
+                val_comb = limpiar_num(datos_maq[col_comb], 75) if col_comb else 75
+                val_refri = limpiar_num(datos_maq[col_refri], 90) if col_refri else 90
+                val_aceite = limpiar_num(datos_maq[col_aceite], 85) if col_aceite else 85
+                val_horo = str(datos_maq[col_horo]) if col_horo and not pd.isna(datos_maq[col_horo]) else "1,245.5"
 
                 st.markdown(f"### Reporte Técnico: {maquina_sel}")
                 
-                # 2. Tarjetas Visuales (Dashboard)
                 c1, c2, c3, c4 = st.columns(4)
                 
                 with c1:
@@ -171,12 +190,12 @@ if st.session_state.admin_mode:
                     """, unsafe_allow_html=True)
                 
                 st.write("")
-                with st.expander("Ver tabla completa de datos de Google Sheets"):
+                with st.expander("Ver tabla de datos original de Google Sheets"):
                     st.dataframe(df_excel, use_container_width=True)
             else:
-                st.error("El archivo Excel debe tener al menos una columna llamada 'Máquina'.")
+                st.error("No se encontró ninguna columna válida en el Excel para identificar las máquinas.")
         except Exception:
-            st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos en Drive.")
+            st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos en Drive o la estructura del archivo.")
             
     elif opcion_admin == "🗑️ Gestionar Reservas":
         st.subheader("Borrador de Reservas Activas")
