@@ -6,7 +6,7 @@ import pytz
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
 
-# --- 1. ESTILO VISUAL CORREGIDO ---
+# --- 1. ESTILO VISUAL ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #006b3f !important; }
@@ -17,9 +17,13 @@ st.markdown("""
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
     div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
     
-    /* Diseño para los encabezados de cada Día */
+    /* Contenedor principal del Día */
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
+    
+    /* Sub-contenedor para cada Hora específica */
+    .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
+    .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -32,14 +36,9 @@ if "reservas" not in st.session_state:
 
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
-
-# NOTA: En False temporalmente para pruebas.
 formulario_cerrado = False 
-# if (ahora.weekday() == 3 and ahora.hour >= 22) or (ahora.weekday() == 4 and ahora.hour < 8):
-#     formulario_cerrado = True
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-# Horas exactas según tu captura de Google Forms
 horas = ["08:00 am - 09:00 am", "09:00 am - 10:45 am", "11:00 am - 12:00 pm", "12:00 pm - 12:45 pm", "02:00 pm - 03:00 pm", "03:00 pm - 03:50 pm"]
 ambientes_opciones = ["Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"]
 equipos_opciones = ["Ningún Equipo en particular", "NH TD5.80", "NH TD5.100", "NH TD90", "JD 3050B", "JD 1040", "NH B110B", "NH L223", "SOLD ELECTRODO MANUAL", "SOLD OXI", "SOLD TIG", "SOLD MIG/MAG", "TORNO", "FRESADORA", "ESMERIL", "PRENSA HIDRAULICA", "REMACHADORA", "FRAGUA", "MAQUETA MOTOR"]
@@ -107,7 +106,7 @@ else:
         st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
         
-        # --- FORMULARIO PASO A PASO ---
+        # --- FORMULARIO CASCADA (DÍA -> HORA -> DETALLES) ---
         st.subheader("📝 Registrar Separación")
         
         profesor = st.selectbox("Docente Responsable", [
@@ -122,37 +121,37 @@ else:
         reservas_temporales = []
         
         if dias_sel:
-            st.markdown("##### 2. Detalles por Día")
-            st.write("Complete los requerimientos específicos para cada día que ha seleccionado.")
+            st.markdown("##### 2. Requerimientos por Bloque Horario")
             
-            # Bucle para crear un bloque verde por cada día elegido
             for d in dias_sel:
-                st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ Requerimientos para el {d.upper()}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()}</div>', unsafe_allow_html=True)
                 
-                # Horas del día
-                h_sel = st.multiselect(f"⏰ Horarios ({d})", horas, key=f"h_{d}")
+                # Seleccionar las horas para este día
+                h_sel = st.multiselect(f"⏰ Seleccione los horarios que utilizará el {d}:", horas, key=f"h_{d}")
                 
-                # Ambientes y Equipos del día
-                col_a, col_e = st.columns(2)
-                with col_a:
-                    a_sel = st.multiselect(f"🏢 Ambientes ({d})", ambientes_opciones, key=f"a_{d}")
-                with col_e:
-                    e_sel = st.multiselect(f"🚜 Equipos ({d})", equipos_opciones, key=f"e_{d}")
-                
-                # Materiales del día
-                m_sel = st.text_input(f"🛠️ Materiales extra ({d})", placeholder="Ej. Tractor con implemento, Sembradoras...", key=f"m_{d}")
-                
-                st.markdown('</div>', unsafe_allow_html=True) # Cierre del bloque verde
-                
-                # Guardar las selecciones de este día
+                # Si el usuario eligió horas, creamos un bloque de detalles por CADA hora
                 if h_sel:
                     for h in h_sel:
+                        st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Requerimientos para el bloque: {h}</div>', unsafe_allow_html=True)
+                        
+                        col_a, col_e = st.columns(2)
+                        with col_a:
+                            a_sel = st.multiselect(f"🏢 Ambientes", ambientes_opciones, key=f"a_{d}_{h}")
+                        with col_e:
+                            e_sel = st.multiselect(f"🚜 Equipos", equipos_opciones, key=f"e_{d}_{h}")
+                        
+                        m_sel = st.text_input(f"🛠️ Materiales extra", placeholder="Ej. Sembradoras...", key=f"m_{d}_{h}")
+                        
+                        st.markdown('</div>', unsafe_allow_html=True) # Cierra el bloque de hora
+                        
                         reservas_temporales.append({
                             "Día": d, "Horario": h, "Profesor": profesor.split(" ")[1], 
                             "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                             "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)",
                             "Materiales": m_sel if m_sel else "(Ninguno)"
                         })
+                
+                st.markdown('</div>', unsafe_allow_html=True) # Cierra el bloque del día
             
             # --- 3. PREVISUALIZACIÓN TIPO HORARIO REAL ---
             if reservas_temporales:
@@ -160,7 +159,6 @@ else:
                 st.markdown("### 👁️ Previsualización de su Horario")
                 st.info("Así quedará su horario registrado en la cuadrícula de la semana. Verifique que no haya errores.")
                 
-                # Crear la tabla visual
                 df_horario_visual = pd.DataFrame(index=horas, columns=dias)
                 df_horario_visual.fillna("", inplace=True)
                 
@@ -178,7 +176,7 @@ else:
                             cruces.append(f"{res['Día']} a las {res['Horario']}")
                     
                     if cruces:
-                        st.error(f"⚠️ **Cruce detectado:** Los bloques ya fueron tomados por otro profesor: {', '.join(cruces)}.")
+                        st.error(f"⚠️ **Cruce detectado:** Los siguientes bloques ya fueron tomados por otro profesor: {', '.join(cruces)}.")
                     else:
                         st.session_state.reservas = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
                         st.success("✅ ¡Horario registrado exitosamente en el MAIPI!")
