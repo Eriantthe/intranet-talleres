@@ -42,8 +42,8 @@ lunes_obj = ahora + timedelta(days=dias_para_lunes)
 viernes_obj = lunes_obj + timedelta(days=4)
 str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime('%d/%m')}"
 
-# NOTA: En False temporalmente para pruebas.
 formulario_cerrado = False 
+# Descomentar para activar bloqueo real:
 # if (dia_semana == 3 and hora >= 22) or (dia_semana == 4 and hora < 8):
 #     formulario_cerrado = True
 
@@ -92,7 +92,6 @@ else:
 # ==========================================
 if st.session_state.admin_mode:
     st.title("⚙️ Panel de Administración")
-    
     opcion_admin = st.radio("Seleccione el módulo:", ["⛽ Panel de Combustible", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario"])
     st.markdown("---")
     
@@ -106,7 +105,7 @@ if st.session_state.admin_mode:
             if 'Máquina' in df_excel.columns and 'Combustible' in df_excel.columns:
                 fig = px.bar(df_excel, x="Combustible", y="Máquina", orientation='h', color="Combustible", color_continuous_scale="RdYlGn")
                 st.plotly_chart(fig, use_container_width=True)
-        except Exception as e:
+        except Exception:
             st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos en Drive.")
             
     elif opcion_admin == "🗑️ Gestionar Reservas":
@@ -115,7 +114,6 @@ if st.session_state.admin_mode:
         
         df_admin = st.session_state.reservas.copy()
         df_admin.insert(0, "❌ Borrar", False)
-        
         df_editado = st.data_editor(df_admin, hide_index=True, use_container_width=True)
         
         if st.button("🗑️ Procesar Eliminaciones"):
@@ -125,19 +123,18 @@ if st.session_state.admin_mode:
             
     elif opcion_admin == "🖨️ Exportar Horario":
         st.subheader(f"Generar Horario Coloreado para PDF ({str_semana})")
-        html_table = """
+        html_table = f"""
         <html><head><meta charset="utf-8">
         <style>
-            table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
-            th { background-color: #006b3f; color: white; border: 1px solid #000; padding: 10px; text-align: center; }
-            td { border: 1px solid #000; padding: 8px; vertical-align: top; width: 16%; }
-            .hora { background-color: #f2f2f2; font-weight: bold; text-align: center; vertical-align: middle; }
+            table {{ width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }}
+            th {{ background-color: #006b3f; color: white; border: 1px solid #000; padding: 10px; text-align: center; }}
+            td {{ border: 1px solid #000; padding: 8px; vertical-align: top; width: 16%; }}
+            .hora {{ background-color: #f2f2f2; font-weight: bold; text-align: center; vertical-align: middle; }}
         </style></head><body>
         <h2 style="text-align: center; color: #006b3f; font-family: Arial;">CRONOGRAMA DE USO DE TALLERES Y EQUIPOS</h2>
+        <h4 style='text-align: center; color: #333; font-family: Arial;'>{str_semana}</h4>
+        <table><tr><th>Hora</th>
         """
-        html_table += f"<h4 style='text-align: center; color: #333; font-family: Arial;'>{str_semana}</h4>"
-        html_table += "<table><tr><th>Hora</th>"
-        
         for d in dias: html_table += f"<th>{d}</th>"
         html_table += "</tr>"
         
@@ -159,16 +156,15 @@ if st.session_state.admin_mode:
         html_table += "</table></body></html>"
         
         st.components.v1.html(html_table, height=600, scrolling=True)
-        st.download_button(label="📄 Descargar Horario para Imprimir (PDF)", data=html_table, file_name="Horario_Coloreado.html", mime="text/html")
+        st.download_button("📄 Descargar Horario (PDF)", html_table, "Horario_Coloreado.html", "text/html")
 
 # ==========================================
 # VISTA 2: PÚBLICA PARA PROFESORES
 # ==========================================
 else:
-    # Mensaje de éxito si se recargó la página tras enviar reserva
     if st.session_state.mostrar_exito:
         st.balloons()
-        st.success("🎉 ¡EXITO! Su separación de ambientes y equipos ha sido procesada y registrada. Ya puede cerrar esta página.")
+        st.success("🎉 ¡EXITO! Su separación de ambientes y equipos ha sido procesada y registrada en el cronograma. Ya puede cerrar esta página.")
         st.session_state.mostrar_exito = False
 
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
@@ -178,9 +174,10 @@ else:
     else:
         st.info(f"✅ **SISTEMA ABIERTO.** Actualmente está separando recursos para la **{str_semana}**.")
         
+        # MATRIZ BASE (Se calculará para mostrar disponibilidad)
         st.subheader("📊 Recursos Ocupados en Tiempo Real")
         matriz = pd.DataFrame(index=horas, columns=dias)
-        matriz.fillna("🟢 Todo Libre", inplace=True)
+        matriz.fillna("🟢 Libre", inplace=True)
         
         for d in dias:
             for h in horas:
@@ -190,7 +187,7 @@ else:
                     for _, r in acts.iterrows():
                         if r["Ambientes"] != "(Ninguno)": ocupados.append(r["Ambientes"])
                         if r["Equipos"] != "(Ninguno)": ocupados.append(r["Equipos"])
-                    matriz.at[h, d] = f"🔴 Tomado: {', '.join(ocupados)}"
+                    matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
                     
         st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
@@ -225,20 +222,26 @@ else:
                         })
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # --- 3. PREVISUALIZACIÓN CON INDICADOR ROJO ---
+            # --- 3. PREVISUALIZACIÓN UNIFICADA (ROJO VS AZUL) ---
             if reservas_temporales:
                 st.markdown("---")
                 st.markdown("### 👁️ Previsualización de su Horario")
-                st.info("Verifique su horario antes de enviar. Lo que no está seleccionado aparecerá en blanco.")
+                st.info("Verifique su horario. Lo reservado por otros aparece en ROJO. Su separación actual resalta en AZUL.")
                 
-                df_horario_visual = pd.DataFrame(index=horas, columns=dias)
-                df_horario_visual.fillna("", inplace=True)
+                df_horario_visual = matriz.copy() # Tomamos la matriz real como base
                 
                 for res in reservas_temporales:
-                    # Aquí añadimos el indicador de "🔴 SEPARADO" en la tabla de previsualización
-                    texto_celda = f"🔴 SEPARADO\n🏢 Amb.: {res['Ambientes']}\n🚜 Eq.: {res['Equipos']}"
-                    df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda
+                    texto_celda_azul = f"🔵 SU SELECCIÓN:\nAmb: {res['Ambientes']}\nEq: {res['Equipos']}"
+                    actual = df_horario_visual.at[res["Horario"], res["Día"]]
                     
+                    # Si el casillero estaba libre, solo ponemos lo azul
+                    if "🟢" in str(actual):
+                        df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda_azul
+                    # Si el casillero ya tenía algo separado por otros (🔴), mostramos AMBOS para que vea cómo comparten el bloque
+                    else:
+                        df_horario_visual.at[res["Horario"], res["Día"]] = str(actual) + "\n\n" + texto_celda_azul
+                    
+                # Usamos table porque respeta muy bien los saltos de línea (\n)
                 st.table(df_horario_visual)
                 
                 # BOTÓN DE CONFIRMACIÓN
@@ -260,8 +263,8 @@ else:
                             
                             if cruce_amb or cruce_eq:
                                 motivo = []
-                                if cruce_amb: motivo.append(f"Ambiente ocupado: {', '.join(cruce_amb)}")
-                                if cruce_eq: motivo.append(f"Equipo ocupado: {', '.join(cruce_eq)}")
+                                if cruce_amb: motivo.append(f"Ambiente: {', '.join(cruce_amb)}")
+                                if cruce_eq: motivo.append(f"Equipo: {', '.join(cruce_eq)}")
                                 cruces.append(f"{d} a las {h} ({' / '.join(motivo)})")
                     
                     if cruces:
