@@ -9,16 +9,16 @@ st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
 # --- 1. ESTILO VISUAL CORREGIDO ---
 st.markdown("""
     <style>
-    /* Fondo verde solo para la barra lateral */
     [data-testid="stSidebar"] { background-color: #006b3f !important; }
-    /* Solo los textos fijos en blanco, NO el contenido de las cajas de texto */
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
     [data-testid="stSidebar"] label p { color: white !important; }
-    /* Cajas de texto con letra negra y fondo blanco */
     input { color: black !important; background-color: white !important; }
     
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
-    div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; }
+    div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
+    
+    /* Diseño para los recuadros de detalle de cada hora */
+    .bloque-detalle { background-color: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 5px; border-left: 5px solid #006b3f; font-weight: bold;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -43,9 +43,8 @@ formulario_cerrado = False
 # --- 4. MENÚ LATERAL OCULTO ---
 st.sidebar.markdown("### 🚜 Talleres y Equipos")
 st.sidebar.markdown("Sistema Oficial de Separación.")
-st.sidebar.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) # Espacio para mandarlo abajo
+st.sidebar.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
-# Sistema de Login Oculto
 if st.session_state.admin_mode:
     st.sidebar.success("✅ Modo Admin")
     if st.sidebar.button("Cerrar Sesión"):
@@ -74,21 +73,18 @@ if st.session_state.admin_mode:
         st.subheader("Estado de Maquinaria en Tiempo Real")
         sheet_id = "13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM"
         csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
-        
         try:
             df_excel = pd.read_csv(csv_url)
             st.dataframe(df_excel, use_container_width=True)
-            
             if 'Máquina' in df_excel.columns and 'Combustible' in df_excel.columns:
                 fig = px.bar(df_excel, x="Combustible", y="Máquina", orientation='h', 
                              color="Combustible", color_continuous_scale="RdYlGn")
                 st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
-            st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos de lectura del enlace de Drive.")
+            st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos en Drive.")
             
     elif opcion_admin == "🗑️ Gestionar Reservas de Profesores":
         st.subheader("Borrador de Reservas Activas")
-        st.write("Selecciona el recuadro a la izquierda de cualquier fila y presiona `Suprimir` (Delete) para borrarla.")
         st.session_state.reservas = st.data_editor(st.session_state.reservas, num_rows="dynamic", use_container_width=True)
 
 # ==========================================
@@ -105,18 +101,17 @@ else:
         dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
         horas = ["08:00 am - 10:45 am", "11:00 am - 12:45 pm", "01:00 pm - 02:00 pm", "02:00 pm - 03:50 pm", "04:00 pm - 06:00 pm"]
         
-        # MATRIZ MAIPI
+        # MATRIZ MAIPI GENERAL
         st.subheader("📊 Disponibilidad en Tiempo Real")
         matriz = pd.DataFrame(index=horas, columns=dias)
         matriz.fillna("🟢 Libre", inplace=True)
         for _, row in st.session_state.reservas.iterrows():
             matriz.at[row["Horario"], row["Día"]] = f"🔴 {row['Profesor']}"
-            
         st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
         
-        # FORMULARIO
-        st.subheader("📝 Registrar Separación")
+        # --- FORMULARIO PASO A PASO ---
+        st.subheader("📝 Registrar Separación (Paso a Paso)")
         
         profesor = st.selectbox("Docente Responsable", [
             "Prof. Alfredo Rebaza Pino", "Prof. Francisco Rojas Alejandro", 
@@ -135,56 +130,60 @@ else:
                 with cols_dias[idx]:
                     horas_por_dia[d] = st.multiselect(f"Horas para el {d}:", horas, key=f"h_{d}")
         
-        st.markdown("##### 3. Requerimientos Generales")
-        col_a, col_e = st.columns(2)
-        with col_a:
-            ambientes = st.multiselect("Ambientes requeridos", ["Motores", "Pool", "Patio", "Rejas", "Campo", "Metalmecánica", "Soldadura"])
-        with col_e:
-            equipos = st.multiselect("Equipos requeridos", ["NH TD5.80", "NH TD90", "NH TD5.100", "JD 3050B", "Retroexcavadora NH B110B", "MAQUETA MOTOR"])
+        # --- SECCIÓN DINÁMICA POR CADA HORA ELEGIDA ---
+        reservas_temporales = []
         
-        materiales = st.text_area("¿Qué materiales, instrumentos o herramientas aparte necesitará?")
-        
-        # --- PREVISUALIZACIÓN TIPO HORARIO ---
         if dias_sel and any(horas_por_dia.values()):
             st.markdown("---")
-            st.markdown("### 👁️ Resumen de su Horario (Previsualización)")
-            st.info("Verifique el orden de su separación. Si todo es correcto, presione Confirmar en la parte inferior.")
+            st.markdown("##### 3. Detalles Específicos por Bloque Horario")
+            st.write("Especifique qué ambientes y equipos usará en cada hora (puede pedir cosas distintas en el mismo día).")
             
-            nuevas_filas = []
-            
-            # Construir la previsualización visual ordenada por días
             for d in dias_sel:
-                horas_d = horas_por_dia.get(d, [])
-                if horas_d:
-                    st.markdown(f"#### 🗓️ **{d}**")
-                    for h in horas_d:
-                        # Se muestran los ambientes y equipos elegidos para esa hora
-                        st.markdown(f"- **⏰ {h}** ➔ **Ambiente:** {', '.join(ambientes) if ambientes else 'Ninguno'} | **Equipos:** {', '.join(equipos) if equipos else 'Ninguno'}")
+                for h in horas_por_dia.get(d, []):
+                    # Barra visual para separar las horas
+                    st.markdown(f'<div class="bloque-detalle">🗓️ {d} | ⏰ {h}</div>', unsafe_allow_html=True)
                     
-                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;**🛠️ Materiales extra:** *{materiales if materiales else 'Ninguno'}*")
-                    st.write("") # Espacio
+                    col_a, col_e = st.columns(2)
+                    with col_a:
+                        amb = st.multiselect("Ambientes", ["Motores", "Pool", "Patio", "Rejas", "Campo", "Metalmecánica", "Soldadura"], key=f"amb_{d}_{h}")
+                    with col_e:
+                        eq = st.multiselect("Equipos", ["NH TD5.80", "NH TD90", "NH TD5.100", "JD 3050B", "Retroexcavadora NH B110B", "MAQUETA MOTOR"], key=f"eq_{d}_{h}")
+                    mat = st.text_input("Materiales extra", key=f"mat_{d}_{h}", placeholder="Ej. Sembradoras al voleo...")
                     
-                    # Guardar los datos estructurados en la memoria para la tabla final
-                    for h in horas_d:
-                        nuevas_filas.append({
-                            "Día": d, "Horario": h, "Profesor": profesor.split(" ")[1], 
-                            "Ambientes": ", ".join(ambientes) if ambientes else "(Ninguno)", 
-                            "Equipos": ", ".join(equipos) if equipos else "(Ninguno)",
-                            "Materiales": materiales if materiales else "(Ninguno)"
-                        })
+                    reservas_temporales.append({
+                        "Día": d, "Horario": h, "Profesor": profesor.split(" ")[1], 
+                        "Ambientes": ", ".join(amb) if amb else "(Ninguno)", 
+                        "Equipos": ", ".join(eq) if eq else "(Ninguno)",
+                        "Materiales": mat if mat else "(Ninguno)"
+                    })
+                    st.write("") # Espaciador
             
-            df_preview = pd.DataFrame(nuevas_filas)
+            # --- PREVISUALIZACIÓN TIPO HORARIO REAL ---
+            st.markdown("---")
+            st.markdown("### 👁️ Previsualización de su Horario")
+            st.info("Así quedará su horario registrado en la cuadrícula de la semana:")
             
-            # BOTÓN FINAL DE CONFIRMACIÓN
-            if st.button("Confirmar Separación"):
+            # Crear una tabla visual vacía
+            df_horario_visual = pd.DataFrame(index=horas, columns=dias)
+            df_horario_visual.fillna("", inplace=True)
+            
+            # Llenar la tabla solo con las elecciones de este profesor
+            for res in reservas_temporales:
+                texto_celda = f"Ambiente: {res['Ambientes']}\nEquipo: {res['Equipos']}"
+                df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda
+                
+            st.table(df_horario_visual)
+            
+            # BOTÓN DE CONFIRMACIÓN
+            if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
                 cruces = []
-                for _, row_prev in df_preview.iterrows():
-                    if "🔴" in matriz.at[row_prev["Horario"], row_prev["Día"]]:
-                        cruces.append(f"{row_prev['Día']} a las {row_prev['Horario']}")
+                for res in reservas_temporales:
+                    if "🔴" in matriz.at[res["Horario"], res["Día"]]:
+                        cruces.append(f"{res['Día']} a las {res['Horario']}")
                 
                 if cruces:
-                    st.error(f"⚠️ **Cruce detectado:** Los bloques ya fueron tomados por otro docente: {', '.join(cruces)}.")
+                    st.error(f"⚠️ **Cruce detectado:** Los bloques ya fueron tomados: {', '.join(cruces)}.")
                 else:
-                    st.session_state.reservas = pd.concat([st.session_state.reservas, df_preview], ignore_index=True)
-                    st.success("✅ ¡Separación registrada exitosamente en el MAIPI!")
+                    st.session_state.reservas = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
+                    st.success("✅ ¡Horario registrado exitosamente en el MAIPI!")
                     st.rerun()
