@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
@@ -22,16 +22,30 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. VARIABLES Y DATOS OFICIALES ---
+# --- 2. VARIABLES DE ESTADO Y DATOS ---
 if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
-
 if "reservas" not in st.session_state:
     st.session_state.reservas = pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
+if "mostrar_exito" not in st.session_state:
+    st.session_state.mostrar_exito = False
 
+# Cálculos de Tiempo (Hora de Lima)
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
+dia_semana = ahora.weekday() 
+hora = ahora.hour
+
+# Determinar las fechas de la "Próxima Semana"
+dias_para_lunes = 7 - dia_semana
+lunes_obj = ahora + timedelta(days=dias_para_lunes)
+viernes_obj = lunes_obj + timedelta(days=4)
+str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime('%d/%m')}"
+
+# NOTA: En False temporalmente para pruebas.
 formulario_cerrado = False 
+# if (dia_semana == 3 and hora >= 22) or (dia_semana == 4 and hora < 8):
+#     formulario_cerrado = True
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"]
@@ -100,7 +114,7 @@ if st.session_state.admin_mode:
         st.write("Marca la casilla '❌ Borrar' en las filas que desees eliminar y presiona el botón inferior.")
         
         df_admin = st.session_state.reservas.copy()
-        df_admin.insert(0, "❌ Borrar", False) # Nueva columna interactiva
+        df_admin.insert(0, "❌ Borrar", False)
         
         df_editado = st.data_editor(df_admin, hide_index=True, use_container_width=True)
         
@@ -110,7 +124,7 @@ if st.session_state.admin_mode:
             st.rerun()
             
     elif opcion_admin == "🖨️ Exportar Horario":
-        st.subheader("Generar Horario Coloreado para PDF")
+        st.subheader(f"Generar Horario Coloreado para PDF ({str_semana})")
         html_table = """
         <html><head><meta charset="utf-8">
         <style>
@@ -120,8 +134,10 @@ if st.session_state.admin_mode:
             .hora { background-color: #f2f2f2; font-weight: bold; text-align: center; vertical-align: middle; }
         </style></head><body>
         <h2 style="text-align: center; color: #006b3f; font-family: Arial;">CRONOGRAMA DE USO DE TALLERES Y EQUIPOS</h2>
-        <table><tr><th>Hora</th>
         """
+        html_table += f"<h4 style='text-align: center; color: #333; font-family: Arial;'>{str_semana}</h4>"
+        html_table += "<table><tr><th>Hora</th>"
+        
         for d in dias: html_table += f"<th>{d}</th>"
         html_table += "</tr>"
         
@@ -149,14 +165,19 @@ if st.session_state.admin_mode:
 # VISTA 2: PÚBLICA PARA PROFESORES
 # ==========================================
 else:
+    # Mensaje de éxito si se recargó la página tras enviar reserva
+    if st.session_state.mostrar_exito:
+        st.balloons()
+        st.success("🎉 ¡EXITO! Su separación de ambientes y equipos ha sido procesada y registrada. Ya puede cerrar esta página.")
+        st.session_state.mostrar_exito = False
+
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
     if formulario_cerrado:
         st.error("🔒 **SISTEMA CERRADO.** El plazo venció el jueves a las 10:00 p.m.")
     else:
-        st.info("✅ **SISTEMA ABIERTO.**")
+        st.info(f"✅ **SISTEMA ABIERTO.** Actualmente está separando recursos para la **{str_semana}**.")
         
-        # MATRIZ INTELIGENTE (Muestra qué recursos están tomados, no bloquea el turno completo)
         st.subheader("📊 Recursos Ocupados en Tiempo Real")
         matriz = pd.DataFrame(index=horas, columns=dias)
         matriz.fillna("🟢 Todo Libre", inplace=True)
@@ -200,14 +221,29 @@ else:
                             "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                             "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)",
                             "Materiales": m_sel if m_sel else "(Ninguno)",
-                            "List_Amb": a_sel, "List_Eq": e_sel # Data cruda para lógica de validación
+                            "List_Amb": a_sel, "List_Eq": e_sel
                         })
                 st.markdown('</div>', unsafe_allow_html=True)
             
+            # --- 3. PREVISUALIZACIÓN CON INDICADOR ROJO ---
             if reservas_temporales:
+                st.markdown("---")
+                st.markdown("### 👁️ Previsualización de su Horario")
+                st.info("Verifique su horario antes de enviar. Lo que no está seleccionado aparecerá en blanco.")
+                
+                df_horario_visual = pd.DataFrame(index=horas, columns=dias)
+                df_horario_visual.fillna("", inplace=True)
+                
+                for res in reservas_temporales:
+                    # Aquí añadimos el indicador de "🔴 SEPARADO" en la tabla de previsualización
+                    texto_celda = f"🔴 SEPARADO\n🏢 Amb.: {res['Ambientes']}\n🚜 Eq.: {res['Equipos']}"
+                    df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda
+                    
+                st.table(df_horario_visual)
+                
+                # BOTÓN DE CONFIRMACIÓN
                 if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
                     cruces = []
-                    # Lógica de validación por recurso, no por bloque horario
                     for res in reservas_temporales:
                         d, h = res["Día"], res["Horario"]
                         amb_nuevos = set(res["List_Amb"])
@@ -219,7 +255,6 @@ else:
                             amb_act = set([a.strip() for a in act["Ambientes"].split(",") if a.strip() and a.strip() != "(Ninguno)"])
                             eq_act = set([e.strip() for e in act["Equipos"].split(",") if e.strip() and e.strip() != "(Ninguno)"])
                             
-                            # Validar colisión (Ignorando "Campo" y "Ningún Equipo en particular")
                             cruce_amb = [a for a in amb_nuevos if a in amb_act and a != "Campo"]
                             cruce_eq = [e for e in eq_nuevos if e in eq_act and e != "Ningún Equipo en particular"]
                             
@@ -230,13 +265,12 @@ else:
                                 cruces.append(f"{d} a las {h} ({' / '.join(motivo)})")
                     
                     if cruces:
-                        st.error(f"⚠️ **Cruce detectado:** Otros docentes ya separaron estos recursos específicos: {', '.join(cruces)}. Modifique su selección.")
+                        st.error(f"⚠️ **Cruce detectado:** Otros docentes ya separaron estos recursos: {', '.join(cruces)}. Modifique su selección.")
                     else:
-                        # Limpiar data cruda antes de guardar
                         for r in reservas_temporales:
                             del r["List_Amb"]
                             del r["List_Eq"]
                         
                         st.session_state.reservas = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
-                        st.success("✅ ¡Recursos registrados exitosamente en el MAIPI!")
+                        st.session_state.mostrar_exito = True
                         st.rerun()
