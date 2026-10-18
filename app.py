@@ -13,13 +13,10 @@ st.markdown("""
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
     [data-testid="stSidebar"] label p { color: white !important; }
     input { color: black !important; background-color: white !important; }
-    
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
     div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
-    
-    .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f; box-shadow: 0 2px 4px rgba(0,0,0,0.05);}
+    .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
-    
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
     </style>
@@ -42,7 +39,6 @@ horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "0
 ambientes_opciones = ["Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"]
 equipos_opciones = ["Ningún Equipo en particular", "NH TD5.80", "NH TD5.100", "NH TD90", "JD 3050B", "JD 1040", "NH B110B", "NH L223", "SOLD ELECTRODO MANUAL", "SOLD OXI", "SOLD TIG", "SOLD MIG/MAG", "TORNO", "FRESADORA", "ESMERIL", "PRENSA HIDRAULICA", "REMACHADORA", "FRAGUA", "MAQUETA MOTOR"]
 
-# Lista oficial de docentes
 profesores_lista = [
     "ROJAS ALEJANDRO, FRANCISCO", "GARCIA ARMAS, JUVENAL", "ALTAMIRANO CHUNGA, LUIS",
     "CACERES GUERRERO, FREDY", "CHEVARRIA MOSCOSO, MARGARITA", "REBAZA PINO, ALFREDO",
@@ -50,7 +46,6 @@ profesores_lista = [
     "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO"
 ]
 
-# Paleta de colores para cada profesor
 colores_prof = {
     "ROJAS ALEJANDRO, FRANCISCO": "#D7BDE2", "GARCIA ARMAS, JUVENAL": "#A3E4D7",
     "ALTAMIRANO CHUNGA, LUIS": "#FAD7A0", "CACERES GUERRERO, FREDY": "#F9E79F",
@@ -102,13 +97,20 @@ if st.session_state.admin_mode:
             
     elif opcion_admin == "🗑️ Gestionar Reservas":
         st.subheader("Borrador de Reservas Activas")
-        st.session_state.reservas = st.data_editor(st.session_state.reservas, num_rows="dynamic", use_container_width=True)
+        st.write("Marca la casilla '❌ Borrar' en las filas que desees eliminar y presiona el botón inferior.")
         
+        df_admin = st.session_state.reservas.copy()
+        df_admin.insert(0, "❌ Borrar", False) # Nueva columna interactiva
+        
+        df_editado = st.data_editor(df_admin, hide_index=True, use_container_width=True)
+        
+        if st.button("🗑️ Procesar Eliminaciones"):
+            st.session_state.reservas = df_editado[df_editado["❌ Borrar"] == False].drop(columns=["❌ Borrar"])
+            st.success("Reservas actualizadas correctamente.")
+            st.rerun()
+            
     elif opcion_admin == "🖨️ Exportar Horario":
         st.subheader("Generar Horario Coloreado para PDF")
-        st.write("Visualiza el horario codificado por colores según cada docente. Haz clic en el botón inferior para descargarlo y guardarlo como PDF.")
-        
-        # Generar código HTML del horario
         html_table = """
         <html><head><meta charset="utf-8">
         <style>
@@ -120,14 +122,12 @@ if st.session_state.admin_mode:
         <h2 style="text-align: center; color: #006b3f; font-family: Arial;">CRONOGRAMA DE USO DE TALLERES Y EQUIPOS</h2>
         <table><tr><th>Hora</th>
         """
-        for d in dias:
-            html_table += f"<th>{d}</th>"
+        for d in dias: html_table += f"<th>{d}</th>"
         html_table += "</tr>"
         
         for h in horas:
             html_table += f"<tr><td class='hora'>{h}</td>"
             for d in dias:
-                # Buscar reserva para este día y hora
                 reserva = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
                 if not reserva.empty:
                     contenido = ""
@@ -135,24 +135,15 @@ if st.session_state.admin_mode:
                     for _, r in reserva.iterrows():
                         prof = r["Profesor"]
                         bg_color = colores_prof.get(prof, "#ffffff")
-                        contenido += f"<b>{prof}</b><br><i>Ambientes:</i> {r['Ambientes']}<br><i>Equipos:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
+                        contenido += f"<b>{prof}</b><br><i>Amb.:</i> {r['Ambientes']}<br><i>Eq.:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
                     html_table += f"<td style='background-color: {bg_color};'>{contenido}</td>"
                 else:
                     html_table += "<td></td>"
             html_table += "</tr>"
-            
         html_table += "</table></body></html>"
         
-        # Mostrar el horario en la página
         st.components.v1.html(html_table, height=600, scrolling=True)
-        
-        # Botón para descargar
-        st.download_button(
-            label="📄 Descargar Horario para Imprimir (PDF)",
-            data=html_table,
-            file_name="Horario_Coloreado_Talleres.html",
-            mime="text/html"
-        )
+        st.download_button(label="📄 Descargar Horario para Imprimir (PDF)", data=html_table, file_name="Horario_Coloreado.html", mime="text/html")
 
 # ==========================================
 # VISTA 2: PÚBLICA PARA PROFESORES
@@ -161,80 +152,91 @@ else:
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
     if formulario_cerrado:
-        st.error("🔒 **SISTEMA CERRADO.** El plazo venció el jueves a las 10:00 p.m. Se reabrirá el viernes a las 8:00 a.m.")
+        st.error("🔒 **SISTEMA CERRADO.** El plazo venció el jueves a las 10:00 p.m.")
     else:
-        st.info("✅ **SISTEMA ABIERTO.** Siga los pasos para separar sus requerimientos de la próxima semana.")
+        st.info("✅ **SISTEMA ABIERTO.**")
         
-        st.subheader("📊 Disponibilidad en Tiempo Real")
+        # MATRIZ INTELIGENTE (Muestra qué recursos están tomados, no bloquea el turno completo)
+        st.subheader("📊 Recursos Ocupados en Tiempo Real")
         matriz = pd.DataFrame(index=horas, columns=dias)
-        matriz.fillna("🟢 Libre", inplace=True)
-        for _, row in st.session_state.reservas.iterrows():
-            matriz.at[row["Horario"], row["Día"]] = f"🔴 Ocupado"
+        matriz.fillna("🟢 Todo Libre", inplace=True)
+        
+        for d in dias:
+            for h in horas:
+                acts = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                if not acts.empty:
+                    ocupados = []
+                    for _, r in acts.iterrows():
+                        if r["Ambientes"] != "(Ninguno)": ocupados.append(r["Ambientes"])
+                        if r["Equipos"] != "(Ninguno)": ocupados.append(r["Equipos"])
+                    matriz.at[h, d] = f"🔴 Tomado: {', '.join(ocupados)}"
+                    
         st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
         
         st.subheader("📝 Registrar Separación")
-        
         profesor = st.selectbox("Docente Responsable", profesores_lista)
         
-        st.markdown("##### 1. Elija los Días de Práctica")
-        dias_sel = st.multiselect("Seleccione los días que desea separar:", dias)
-        
+        dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias)
         reservas_temporales = []
         
         if dias_sel:
             st.markdown("##### 2. Requerimientos por Bloque Horario")
-            
             for d in dias_sel:
                 st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()}</div>', unsafe_allow_html=True)
-                
-                h_sel = st.multiselect(f"⏰ Seleccione los horarios que utilizará el {d}:", horas, key=f"h_{d}")
+                h_sel = st.multiselect(f"⏰ Seleccione los horarios para el {d}:", horas, key=f"h_{d}")
                 
                 if h_sel:
                     for h in h_sel:
-                        st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Requerimientos para el bloque: {h}</div>', unsafe_allow_html=True)
-                        
+                        st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
                         col_a, col_e = st.columns(2)
-                        with col_a:
-                            a_sel = st.multiselect(f"🏢 Ambientes", ambientes_opciones, key=f"a_{d}_{h}")
-                        with col_e:
-                            e_sel = st.multiselect(f"🚜 Equipos", equipos_opciones, key=f"e_{d}_{h}")
-                        
-                        m_sel = st.text_input(f"🛠️ Materiales extra", placeholder="Ej. Sembradoras...", key=f"m_{d}_{h}")
-                        
+                        with col_a: a_sel = st.multiselect(f"🏢 Ambientes", ambientes_opciones, key=f"a_{d}_{h}")
+                        with col_e: e_sel = st.multiselect(f"🚜 Equipos", equipos_opciones, key=f"e_{d}_{h}")
+                        m_sel = st.text_input(f"🛠️ Materiales extra", key=f"m_{d}_{h}")
                         st.markdown('</div>', unsafe_allow_html=True)
                         
                         reservas_temporales.append({
                             "Día": d, "Horario": h, "Profesor": profesor, 
                             "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                             "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)",
-                            "Materiales": m_sel if m_sel else "(Ninguno)"
+                            "Materiales": m_sel if m_sel else "(Ninguno)",
+                            "List_Amb": a_sel, "List_Eq": e_sel # Data cruda para lógica de validación
                         })
-                
                 st.markdown('</div>', unsafe_allow_html=True)
             
             if reservas_temporales:
-                st.markdown("---")
-                st.markdown("### 👁️ Previsualización de su Horario")
-                
-                df_horario_visual = pd.DataFrame(index=horas, columns=dias)
-                df_horario_visual.fillna("", inplace=True)
-                
-                for res in reservas_temporales:
-                    texto_celda = f"Ambiente: {res['Ambientes']}\nEquipo: {res['Equipos']}"
-                    df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda
-                    
-                st.table(df_horario_visual)
-                
                 if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
                     cruces = []
+                    # Lógica de validación por recurso, no por bloque horario
                     for res in reservas_temporales:
-                        if "🔴" in matriz.at[res["Horario"], res["Día"]]:
-                            cruces.append(f"{res['Día']} a las {res['Horario']}")
+                        d, h = res["Día"], res["Horario"]
+                        amb_nuevos = set(res["List_Amb"])
+                        eq_nuevos = set(res["List_Eq"])
+                        
+                        actuales_dh = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                        
+                        for _, act in actuales_dh.iterrows():
+                            amb_act = set([a.strip() for a in act["Ambientes"].split(",") if a.strip() and a.strip() != "(Ninguno)"])
+                            eq_act = set([e.strip() for e in act["Equipos"].split(",") if e.strip() and e.strip() != "(Ninguno)"])
+                            
+                            # Validar colisión (Ignorando "Campo" y "Ningún Equipo en particular")
+                            cruce_amb = [a for a in amb_nuevos if a in amb_act and a != "Campo"]
+                            cruce_eq = [e for e in eq_nuevos if e in eq_act and e != "Ningún Equipo en particular"]
+                            
+                            if cruce_amb or cruce_eq:
+                                motivo = []
+                                if cruce_amb: motivo.append(f"Ambiente ocupado: {', '.join(cruce_amb)}")
+                                if cruce_eq: motivo.append(f"Equipo ocupado: {', '.join(cruce_eq)}")
+                                cruces.append(f"{d} a las {h} ({' / '.join(motivo)})")
                     
                     if cruces:
-                        st.error(f"⚠️ **Cruce detectado:** Los siguientes bloques ya fueron tomados por otro profesor: {', '.join(cruces)}.")
+                        st.error(f"⚠️ **Cruce detectado:** Otros docentes ya separaron estos recursos específicos: {', '.join(cruces)}. Modifique su selección.")
                     else:
+                        # Limpiar data cruda antes de guardar
+                        for r in reservas_temporales:
+                            del r["List_Amb"]
+                            del r["List_Eq"]
+                        
                         st.session_state.reservas = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
-                        st.success("✅ ¡Horario registrado exitosamente en el MAIPI!")
+                        st.success("✅ ¡Recursos registrados exitosamente en el MAIPI!")
                         st.rerun()
