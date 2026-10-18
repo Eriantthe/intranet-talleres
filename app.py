@@ -22,7 +22,7 @@ def cargar_reservas():
             return pd.DataFrame(data)
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
-    return pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Fecha/Hora Registro"])
+    return pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario", "Fecha/Hora Registro"])
 
 def guardar_reservas_en_nube(df):
     try:
@@ -251,6 +251,7 @@ if st.session_state.admin_mode:
                 
                 st.markdown("---")
                 
+                # --- GRÁFICO HISTÓRICO ---
                 st.markdown("### 📈 Análisis Histórico de Rendimiento")
                 
                 metrica_grafico = st.selectbox(
@@ -316,7 +317,7 @@ if st.session_state.admin_mode:
         st.write("Marca la casilla '❌ Borrar' en las filas que desees eliminar y presiona el botón inferior para borrar de la nube.")
         
         df_admin = st.session_state.reservas.copy()
-        columnas_orden = ["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"]
+        columnas_orden = ["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
         columnas_presentes = [c for c in columnas_orden if c in df_admin.columns]
         df_admin = df_admin[columnas_presentes]
         
@@ -362,7 +363,8 @@ if st.session_state.admin_mode:
                         prof = r["Profesor"]
                         bg_color = colores_prof.get(prof, "#ffffff")
                         fecha_reg = f"<small style='color:#555;'>({r.get('Fecha/Hora Registro', '')})</small><br>" if r.get('Fecha/Hora Registro', '') else ""
-                        contenido += f"<b>{prof}</b><br>{fecha_reg}<i>Amb.:</i> {r['Ambientes']}<br><i>Eq.:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
+                        op_tag = " <b style='color:#b71c1c;'>[Requiere Operario]</b>" if r.get("Operario", "") == "Sí" else ""
+                        contenido += f"<b>{prof}</b>{op_tag}<br>{fecha_reg}<i>Amb.:</i> {r['Ambientes']}<br><i>Eq.:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
                     html_table += f"<td style='background-color: {bg_color};'>{contenido}</td>"
                 else:
                     html_table += "<td></td>"
@@ -443,7 +445,6 @@ else:
                     for h in h_sel:
                         st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
                         
-                        # --- CALCULAR RECURSOS YA OCUPADOS EN ESTE BLOQUE ESPECÍFICO ---
                         ocupados_en_bloque = st.session_state.reservas[
                             (st.session_state.reservas["Día"] == d) & 
                             (st.session_state.reservas["Horario"] == h)
@@ -461,7 +462,6 @@ else:
                                 if e_limp and e_limp != "(Ninguno)" and e_limp != "Ningún Equipo en particular":
                                     eq_ya_ocupados.add(e_limp)
 
-                        # Formatear opciones con marca visual
                         def formatear_amb(nombre):
                             if nombre in amb_ya_ocupados:
                                 return f"🔴 [OCUPADO] {nombre}"
@@ -488,7 +488,6 @@ else:
                                 key=f"e_{d}_{h}_{st.session_state.form_key}"
                             )
                             
-                        # Alertas en vivo bajo los selectores si eligió algo ocupado
                         cruces_inmediatos_a = [a for a in a_sel if a in amb_ya_ocupados]
                         cruces_inmediatos_e = [e for e in e_sel if e in eq_ya_ocupados]
                         if cruces_inmediatos_a or cruces_inmediatos_e:
@@ -497,10 +496,20 @@ else:
                             if cruces_inmediatos_e: msgs.append(f"Equipo(s): {', '.join(cruces_inmediatos_e)}")
                             st.warning(f"⚠️ **Atención:** Ya se encuentra ocupado en este horario: {' | '.join(msgs)}")
                             
-                        m_sel = st.text_input(
-                            f"🛠️ Materiales extra", 
-                            key=f"m_{d}_{h}_{st.session_state.form_key}"
-                        )
+                        col_mat, col_op = st.columns([3, 1])
+                        with col_mat:
+                            m_sel = st.text_input(
+                                f"🛠️ Materiales extra", 
+                                key=f"m_{d}_{h}_{st.session_state.form_key}"
+                            )
+                        with col_op:
+                            st.write("")
+                            st.write("")
+                            req_operario = st.checkbox(
+                                "👷 Requiere Operario", 
+                                key=f"op_{d}_{h}_{st.session_state.form_key}"
+                            )
+                            
                         st.markdown('</div>', unsafe_allow_html=True)
                         
                         timestamp_actual = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
@@ -512,6 +521,7 @@ else:
                             "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                             "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)", 
                             "Materiales": m_sel if m_sel else "(Ninguno)", 
+                            "Operario": "Sí" if req_operario else "No",
                             "Fecha/Hora Registro": timestamp_actual,
                             "List_Amb": a_sel, 
                             "List_Eq": e_sel
@@ -526,7 +536,8 @@ else:
                 df_horario_visual = matriz.copy()
                 
                 for res in reservas_temporales:
-                    texto_celda_azul = f"🔵 SU SELECCIÓN:\nAmb: {res['Ambientes']}\nEq: {res['Equipos']}"
+                    tag_op = " [Operario: SÍ]" if res["Operario"] == "Sí" else ""
+                    texto_celda_azul = f"🔵 SU SELECCIÓN:\nAmb: {res['Ambientes']}\nEq: {res['Equipos']}{tag_op}"
                     actual = df_horario_visual.at[res["Horario"], res["Día"]]
                     
                     if "🟢" in str(actual):
