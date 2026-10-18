@@ -6,47 +6,68 @@ import pytz
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
 
-# --- 1. ESTILO VISUAL (VERDE UNALM) ---
+# --- 1. ESTILO VISUAL CORREGIDO ---
 st.markdown("""
     <style>
+    /* Fondo verde solo para la barra lateral */
     [data-testid="stSidebar"] { background-color: #006b3f !important; }
-    [data-testid="stSidebar"] * { color: white !important; }
+    /* Solo los textos fijos en blanco, NO el contenido de las cajas de texto */
+    [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
+    [data-testid="stSidebar"] label p { color: white !important; }
+    /* Cajas de texto con letra negra y fondo blanco */
+    input { color: black !important; background-color: white !important; }
+    
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
-    /* Darle un color destacado al boton principal */
-    div.stButton > button:first-child { background-color: #006b3f; color: white; }
+    div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 2. LÓGICA DE FECHAS Y CIERRE ---
+# --- 2. VARIABLES DE ESTADO ---
+if "admin_mode" not in st.session_state:
+    st.session_state.admin_mode = False
+
+if "reservas" not in st.session_state:
+    st.session_state.reservas = pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
+
+# --- 3. LÓGICA DE FECHAS (Cierre Jueves 10pm - Abre Viernes 8am) ---
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
 dia_semana = ahora.weekday() 
 hora = ahora.hour
 
-# NOTA: Está en "False" temporalmente para que puedas hacer pruebas este fin de semana.
-# Cuando quieras que el bloqueo funcione, borra el "False" y descomenta las dos líneas de abajo.
+# NOTA: En False temporalmente para que puedas hacer pruebas hoy.
 formulario_cerrado = False 
 # if (dia_semana == 3 and hora >= 22) or (dia_semana == 4 and hora < 8):
 #     formulario_cerrado = True
 
-if "reservas" not in st.session_state:
-    st.session_state.reservas = pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
-
-# --- 3. MENÚ OCULTO ---
+# --- 4. MENÚ LATERAL OCULTO ---
 st.sidebar.markdown("### 🚜 Talleres y Equipos")
 st.sidebar.markdown("Sistema Oficial de Separación.")
-st.sidebar.markdown("---")
-clave_secreta = st.sidebar.text_input("Acceso Admin", type="password", help="Exclusivo Jefatura")
+st.sidebar.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True) # Espacio para mandarlo abajo
+
+# Sistema de Login Oculto
+if st.session_state.admin_mode:
+    st.sidebar.success("✅ Modo Admin")
+    if st.sidebar.button("Cerrar Sesión"):
+        st.session_state.admin_mode = False
+        st.rerun()
+else:
+    with st.sidebar.expander("🔑 Acceso"):
+        clave = st.text_input("Contraseña", type="password")
+        if st.button("Entrar"):
+            if clave == "orellana2026":
+                st.session_state.admin_mode = True
+                st.rerun()
+            else:
+                st.error("Clave incorrecta")
 
 # ==========================================
-# VISTA DE ADMINISTRADOR (CLAVE: orellana2026)
+# VISTA 1: ADMINISTRADOR
 # ==========================================
-if clave_secreta == "orellana2026":
+if st.session_state.admin_mode:
     st.title("⚙️ Panel de Administración")
-    st.success("Modo Administrador Activo.")
     
-    # Reemplazamos los tabs por botones de radio para evitar errores de renderizado
-    opcion_admin = st.radio("Navegación Admin:", ["⛽ Panel de Combustible (Excel)", "🗑️ Gestionar Reservas de Profesores"])
+    opcion_admin = st.radio("Seleccione el módulo:", ["⛽ Panel de Combustible (Excel)", "🗑️ Gestionar Reservas de Profesores"])
     st.markdown("---")
     
     if opcion_admin == "⛽ Panel de Combustible (Excel)":
@@ -58,27 +79,21 @@ if clave_secreta == "orellana2026":
             df_excel = pd.read_csv(csv_url)
             st.dataframe(df_excel, use_container_width=True)
             
-            # Generar gráfico solo si las columnas existen para evitar que la app colapse
             if 'Máquina' in df_excel.columns and 'Combustible' in df_excel.columns:
                 fig = px.bar(df_excel, x="Combustible", y="Máquina", orientation='h', 
                              color="Combustible", color_continuous_scale="RdYlGn")
                 st.plotly_chart(fig, use_container_width=True)
         except Exception as e:
-            st.error("⚠️ No se pudo cargar el Excel. Asegúrate de que el archivo de Google Sheets tenga los permisos en 'Cualquier usuario con el enlace puede leer'.")
+            st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos de lectura del enlace de Drive.")
             
     elif opcion_admin == "🗑️ Gestionar Reservas de Profesores":
         st.subheader("Borrador de Reservas Activas")
-        st.write("Selecciona el recuadro a la izquierda de cualquier fila y presiona `Suprimir` (Delete) en tu teclado para borrarla.")
-        if not st.session_state.reservas.empty:
-            st.session_state.reservas = st.data_editor(st.session_state.reservas, num_rows="dynamic", use_container_width=True)
-        else:
-            st.info("Aún no hay reservas registradas en la memoria temporal.")
+        st.write("Selecciona el recuadro a la izquierda de cualquier fila y presiona `Suprimir` (Delete) para borrarla.")
+        st.session_state.reservas = st.data_editor(st.session_state.reservas, num_rows="dynamic", use_container_width=True)
 
 # ==========================================
-# VISTA PÚBLICA PARA PROFESORES
+# VISTA 2: PÚBLICA PARA PROFESORES
 # ==========================================
-elif clave_secreta != "" and clave_secreta != "orellana2026":
-    st.error("❌ Clave incorrecta.")
 else:
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
@@ -100,7 +115,7 @@ else:
         st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
         
-        # FORMULARIO REACTIVO (Muestra opciones dinámicamente)
+        # FORMULARIO
         st.subheader("📝 Registrar Separación")
         
         profesor = st.selectbox("Docente Responsable", [
@@ -112,7 +127,6 @@ else:
         st.markdown("##### 1. Elija los Días de Práctica")
         dias_sel = st.multiselect("Seleccione uno o varios días:", dias)
         
-        # Generar selectores de hora ESPECÍFICOS para cada día seleccionado
         horas_por_dia = {}
         if dias_sel:
             st.markdown("##### 2. Asigne los Horarios para cada Día elegido")
@@ -130,24 +144,36 @@ else:
         
         materiales = st.text_area("¿Qué materiales, instrumentos o herramientas aparte necesitará?")
         
-        # SISTEMA DE PREVISUALIZACIÓN EN VIVO
+        # --- PREVISUALIZACIÓN TIPO HORARIO ---
         if dias_sel and any(horas_por_dia.values()):
             st.markdown("---")
-            st.markdown("### 👁️ Previsualización de su Reserva")
-            st.info("Revise su resumen. Si todo es correcto, presione Confirmar.")
+            st.markdown("### 👁️ Resumen de su Horario (Previsualización)")
+            st.info("Verifique el orden de su separación. Si todo es correcto, presione Confirmar en la parte inferior.")
             
             nuevas_filas = []
+            
+            # Construir la previsualización visual ordenada por días
             for d in dias_sel:
-                for h in horas_por_dia.get(d, []):
-                    nuevas_filas.append({
-                        "Día": d, "Horario": h, "Profesor": profesor.split(" ")[1], 
-                        "Ambientes": ", ".join(ambientes) if ambientes else "(Ninguno)", 
-                        "Equipos": ", ".join(equipos) if equipos else "(Ninguno)",
-                        "Materiales": materiales if materiales else "(Ninguno)"
-                    })
+                horas_d = horas_por_dia.get(d, [])
+                if horas_d:
+                    st.markdown(f"#### 🗓️ **{d}**")
+                    for h in horas_d:
+                        # Se muestran los ambientes y equipos elegidos para esa hora
+                        st.markdown(f"- **⏰ {h}** ➔ **Ambiente:** {', '.join(ambientes) if ambientes else 'Ninguno'} | **Equipos:** {', '.join(equipos) if equipos else 'Ninguno'}")
+                    
+                    st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;**🛠️ Materiales extra:** *{materiales if materiales else 'Ninguno'}*")
+                    st.write("") # Espacio
+                    
+                    # Guardar los datos estructurados en la memoria para la tabla final
+                    for h in horas_d:
+                        nuevas_filas.append({
+                            "Día": d, "Horario": h, "Profesor": profesor.split(" ")[1], 
+                            "Ambientes": ", ".join(ambientes) if ambientes else "(Ninguno)", 
+                            "Equipos": ", ".join(equipos) if equipos else "(Ninguno)",
+                            "Materiales": materiales if materiales else "(Ninguno)"
+                        })
             
             df_preview = pd.DataFrame(nuevas_filas)
-            st.dataframe(df_preview, use_container_width=True)
             
             # BOTÓN FINAL DE CONFIRMACIÓN
             if st.button("Confirmar Separación"):
@@ -157,8 +183,8 @@ else:
                         cruces.append(f"{row_prev['Día']} a las {row_prev['Horario']}")
                 
                 if cruces:
-                    st.error(f"⚠️ **Cruce detectado:** Los siguientes bloques ya fueron tomados por otro docente: {', '.join(cruces)}. Desmárquelos e intente de nuevo.")
+                    st.error(f"⚠️ **Cruce detectado:** Los bloques ya fueron tomados por otro docente: {', '.join(cruces)}.")
                 else:
                     st.session_state.reservas = pd.concat([st.session_state.reservas, df_preview], ignore_index=True)
-                    st.success("✅ ¡Separación en bloque registrada exitosamente en el MAIPI!")
+                    st.success("✅ ¡Separación registrada exitosamente en el MAIPI!")
                     st.rerun()
