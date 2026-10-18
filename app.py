@@ -22,7 +22,7 @@ def cargar_reservas():
             return pd.DataFrame(data)
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
-    return pd.DataFrame(columns=["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
+    return pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Fecha/Hora Registro"])
 
 def guardar_reservas_en_nube(df):
     try:
@@ -54,8 +54,8 @@ formulario_cerrado = False
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"]
-ambientes_opciones = ["Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"]
-equipos_opciones = [
+ambientes_base = ["Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"]
+equipos_base = [
     "Ningún Equipo en particular", "NH TD5.80", "NH TD5.100", "NH TD90", "JD 3050B", 
     "JD 1040", "NH B110B", "NH L223", "SOLD ELECTRODO MANUAL", "SOLD OXI", 
     "SOLD TIG", "SOLD MIG/MAG", "TORNO", "FRESADORA", "ESMERIL", "PRENSA HIDRAULICA", 
@@ -98,7 +98,6 @@ st.markdown("""
     .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
     .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
     
-    /* Barra Superior Tabs Admin */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #f0f2f6;
@@ -252,7 +251,6 @@ if st.session_state.admin_mode:
                 
                 st.markdown("---")
                 
-                # --- GRÁFICO HISTÓRICO ---
                 st.markdown("### 📈 Análisis Histórico de Rendimiento")
                 
                 metrica_grafico = st.selectbox(
@@ -405,10 +403,10 @@ else:
                 if not acts.empty:
                     ocupados = []
                     for _, r in acts.iterrows():
-                        if r["Ambientes"] != "(Ninguno)": 
-                            ocupados.append(r["Ambientes"])
-                        if r["Equipos"] != "(Ninguno)": 
-                            ocupados.append(r["Equipos"])
+                        if str(r["Ambientes"]) != "(Ninguno)": 
+                            ocupados.append(str(r["Ambientes"]))
+                        if str(r["Equipos"]) != "(Ninguno)": 
+                            ocupados.append(str(r["Equipos"]))
                     matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
                     
         st.dataframe(matriz, use_container_width=True)
@@ -445,19 +443,59 @@ else:
                     for h in h_sel:
                         st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
                         
+                        # --- CALCULAR RECURSOS YA OCUPADOS EN ESTE BLOQUE ESPECÍFICO ---
+                        ocupados_en_bloque = st.session_state.reservas[
+                            (st.session_state.reservas["Día"] == d) & 
+                            (st.session_state.reservas["Horario"] == h)
+                        ]
+                        
+                        amb_ya_ocupados = set()
+                        eq_ya_ocupados = set()
+                        for _, fila_o in ocupados_en_bloque.iterrows():
+                            for a in str(fila_o["Ambientes"]).split(","):
+                                a_limp = a.strip()
+                                if a_limp and a_limp != "(Ninguno)" and a_limp != "Campo":
+                                    amb_ya_ocupados.add(a_limp)
+                            for e in str(fila_o["Equipos"]).split(","):
+                                e_limp = e.strip()
+                                if e_limp and e_limp != "(Ninguno)" and e_limp != "Ningún Equipo en particular":
+                                    eq_ya_ocupados.add(e_limp)
+
+                        # Formatear opciones con marca visual
+                        def formatear_amb(nombre):
+                            if nombre in amb_ya_ocupados:
+                                return f"🔴 [OCUPADO] {nombre}"
+                            return nombre
+
+                        def formatear_eq(nombre):
+                            if nombre in eq_ya_ocupados:
+                                return f"🔴 [OCUPADO] {nombre}"
+                            return nombre
+
                         col_a, col_e = st.columns(2)
                         with col_a: 
                             a_sel = st.multiselect(
                                 f"🏢 Ambientes", 
-                                ambientes_opciones, 
+                                ambientes_base, 
+                                format_func=formatear_amb,
                                 key=f"a_{d}_{h}_{st.session_state.form_key}"
                             )
                         with col_e: 
                             e_sel = st.multiselect(
                                 f"🚜 Equipos", 
-                                equipos_opciones, 
+                                equipos_base, 
+                                format_func=formatear_eq,
                                 key=f"e_{d}_{h}_{st.session_state.form_key}"
                             )
+                            
+                        # Alertas en vivo bajo los selectores si eligió algo ocupado
+                        cruces_inmediatos_a = [a for a in a_sel if a in amb_ya_ocupados]
+                        cruces_inmediatos_e = [e for e in e_sel if e in eq_ya_ocupados]
+                        if cruces_inmediatos_a or cruces_inmediatos_e:
+                            msgs = []
+                            if cruces_inmediatos_a: msgs.append(f"Ambiente(s): {', '.join(cruces_inmediatos_a)}")
+                            if cruces_inmediatos_e: msgs.append(f"Equipo(s): {', '.join(cruces_inmediatos_e)}")
+                            st.warning(f"⚠️ **Atención:** Ya se encuentra ocupado en este horario: {' | '.join(msgs)}")
                             
                         m_sel = st.text_input(
                             f"🛠️ Materiales extra", 
@@ -468,13 +506,13 @@ else:
                         timestamp_actual = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
                         
                         reservas_temporales.append({
-                            "Fecha/Hora Registro": timestamp_actual,
                             "Día": d, 
                             "Horario": h, 
                             "Profesor": profesor, 
                             "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                             "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)", 
                             "Materiales": m_sel if m_sel else "(Ninguno)", 
+                            "Fecha/Hora Registro": timestamp_actual,
                             "List_Amb": a_sel, 
                             "List_Eq": e_sel
                         })
