@@ -7,7 +7,7 @@ import time
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
 
-# --- 1. ESTILO VISUAL ---
+# --- 1. ESTILO VISUAL Y TARJETAS INTERACTIVAS ---
 st.markdown("""
     <style>
     [data-testid="stSidebar"] { background-color: #006b3f !important; }
@@ -20,6 +20,16 @@ st.markdown("""
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
+    
+    /* Diseño de las Tarjetas Visuales de Fluidos */
+    .tarjeta-fluido {
+        background-color: white; padding: 20px; border-radius: 15px; 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; 
+        border-bottom: 5px solid #006b3f; margin-bottom: 10px;
+    }
+    .icono-fluido { font-size: 45px; margin-bottom: 5px; }
+    .valor-fluido { font-size: 30px; font-weight: bold; color: #2c3e50; margin: 0; }
+    .titulo-fluido { font-size: 14px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 1px;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -29,7 +39,7 @@ if "admin_mode" not in st.session_state:
 if "reservas" not in st.session_state:
     st.session_state.reservas = pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
 if "form_key" not in st.session_state:
-    st.session_state.form_key = 0 # Llave maestra para forzar el borrado del formulario
+    st.session_state.form_key = 0
 
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
@@ -42,8 +52,6 @@ viernes_obj = lunes_obj + timedelta(days=4)
 str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime('%d/%m')}"
 
 formulario_cerrado = False 
-# if (dia_semana == 3 and hora >= 22) or (dia_semana == 4 and hora < 8):
-#     formulario_cerrado = True
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"]
@@ -90,19 +98,83 @@ else:
 # ==========================================
 if st.session_state.admin_mode:
     st.title("⚙️ Panel de Administración")
-    opcion_admin = st.radio("Seleccione el módulo:", ["⛽ Panel de Combustible", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario"])
+    opcion_admin = st.radio("Seleccione el módulo:", ["🚜 Control Visual de Maquinaria", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario"])
     st.markdown("---")
     
-    if opcion_admin == "⛽ Panel de Combustible":
-        st.subheader("Estado de Maquinaria en Tiempo Real")
+    if opcion_admin == "🚜 Control Visual de Maquinaria":
+        st.subheader("Estado de Fluidos y Horómetro en Tiempo Real")
         sheet_id = "13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM"
         csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
+        
         try:
             df_excel = pd.read_csv(csv_url)
-            st.dataframe(df_excel, use_container_width=True)
-            if 'Máquina' in df_excel.columns and 'Combustible' in df_excel.columns:
-                fig = px.bar(df_excel, x="Combustible", y="Máquina", orientation='h', color="Combustible", color_continuous_scale="RdYlGn")
-                st.plotly_chart(fig, use_container_width=True)
+            
+            if 'Máquina' in df_excel.columns:
+                # 1. Selector interactivo de Máquina
+                maquina_sel = st.selectbox("Seleccione el equipo para inspeccionar:", df_excel['Máquina'].unique())
+                datos_maq = df_excel[df_excel['Máquina'] == maquina_sel].iloc[0]
+                
+                # Función segura para extraer el número (por si tiene el símbolo % en el excel)
+                def limpiar_num(valor, default):
+                    if pd.isna(valor): return default
+                    try: return float(str(valor).replace('%', '').strip())
+                    except: return default
+
+                # Extraer datos reales del Excel o usar valores de prueba si la columna no existe aún
+                val_comb = limpiar_num(datos_maq.get('Combustible', 75), 75)
+                val_refri = limpiar_num(datos_maq.get('Refrigerante', 90), 90)
+                val_aceite = limpiar_num(datos_maq.get('Aceite', 85), 85)
+                val_horo = datos_maq.get('Horómetro', "1,245.5") if 'Horómetro' in datos_maq else "1,245.5"
+
+                st.markdown(f"### Reporte Técnico: {maquina_sel}")
+                
+                # 2. Tarjetas Visuales (Dashboard)
+                c1, c2, c3, c4 = st.columns(4)
+                
+                with c1:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">⛽</div>
+                        <div class="titulo-fluido">Combustible (Tanque)</div>
+                        <p class="valor-fluido">{int(val_comb)}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(min(max(int(val_comb), 0), 100) / 100)
+
+                with c2:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">🏺</div>
+                        <div class="titulo-fluido">Refrigerante (Radiador)</div>
+                        <p class="valor-fluido">{int(val_refri)}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(min(max(int(val_refri), 0), 100) / 100)
+
+                with c3:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">🛢️</div>
+                        <div class="titulo-fluido">Aceite de Motor</div>
+                        <p class="valor-fluido">{int(val_aceite)}%</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.progress(min(max(int(val_aceite), 0), 100) / 100)
+
+                with c4:
+                    st.markdown(f"""
+                    <div class="tarjeta-fluido">
+                        <div class="icono-fluido">⏱️</div>
+                        <div class="titulo-fluido">Horómetro (Reloj)</div>
+                        <p class="valor-fluido">{val_horo} <span style='font-size:16px;'>hrs</span></p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                st.write("")
+                with st.expander("Ver tabla completa de datos de Google Sheets"):
+                    st.dataframe(df_excel, use_container_width=True)
+            else:
+                st.error("El archivo Excel debe tener al menos una columna llamada 'Máquina'.")
         except Exception:
             st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos en Drive.")
             
@@ -184,9 +256,7 @@ else:
         
         st.subheader("📝 Registrar Separación")
         
-        # Uso de form_key para asegurar que las opciones se limpian por completo tras guardar
         profesor = st.selectbox("Docente Responsable", profesores_lista, key=f"prof_{st.session_state.form_key}")
-        
         dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias, key=f"dias_main_{st.session_state.form_key}")
         reservas_temporales = []
         
@@ -232,7 +302,6 @@ else:
                     
                 st.table(df_horario_visual)
                 
-                # Crear un espacio para el mensaje de éxito antes del botón
                 placeholder_exito = st.empty()
                 
                 if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
@@ -266,14 +335,10 @@ else:
                         
                         st.session_state.reservas = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
                         
-                        # Mensajes visuales y notificación tipo pestaña
                         st.balloons()
                         st.toast("✅ ¡Guardado satisfactoriamente!", icon="🎉")
                         placeholder_exito.success("✅ ¡Guardado satisfactoriamente! La pantalla se limpiará automáticamente en 5 segundos.")
                         
-                        # Espera de 5 segundos para asegurar la lectura
                         time.sleep(5)
-                        
-                        # Incrementar la llave maestra para destruir el formulario actual y forzar uno nuevo en blanco
                         st.session_state.form_key += 1
                         st.rerun()
