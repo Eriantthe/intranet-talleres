@@ -37,12 +37,29 @@ ahora = datetime.now(tz_lima)
 formulario_cerrado = False 
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
-
-# NUEVOS BLOQUES HORARIOS ACADÉMICOS
 horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"]
 
 ambientes_opciones = ["Soldadura", "Metalmecánica", "Motores", "Pool", "Patio", "Rejas", "Campo"]
 equipos_opciones = ["Ningún Equipo en particular", "NH TD5.80", "NH TD5.100", "NH TD90", "JD 3050B", "JD 1040", "NH B110B", "NH L223", "SOLD ELECTRODO MANUAL", "SOLD OXI", "SOLD TIG", "SOLD MIG/MAG", "TORNO", "FRESADORA", "ESMERIL", "PRENSA HIDRAULICA", "REMACHADORA", "FRAGUA", "MAQUETA MOTOR"]
+
+# Lista oficial de docentes
+profesores_lista = [
+    "ROJAS ALEJANDRO, FRANCISCO", "GARCIA ARMAS, JUVENAL", "ALTAMIRANO CHUNGA, LUIS",
+    "CACERES GUERRERO, FREDY", "CHEVARRIA MOSCOSO, MARGARITA", "REBAZA PINO, ALFREDO",
+    "ZINGG ROSELL, AUGUSTO", "VASQUEZ CACERES, JAIME", "ORELLANA PARDAVE, JOSE",
+    "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO"
+]
+
+# Paleta de colores para cada profesor
+colores_prof = {
+    "ROJAS ALEJANDRO, FRANCISCO": "#D7BDE2", "GARCIA ARMAS, JUVENAL": "#A3E4D7",
+    "ALTAMIRANO CHUNGA, LUIS": "#FAD7A0", "CACERES GUERRERO, FREDY": "#F9E79F",
+    "CHEVARRIA MOSCOSO, MARGARITA": "#F5B7B1", "REBAZA PINO, ALFREDO": "#B4CDE6",
+    "ZINGG ROSELL, AUGUSTO": "#C5E0B4", "VASQUEZ CACERES, JAIME": "#D2B4DE",
+    "ORELLANA PARDAVE, JOSE": "#AED6F1", "SALAS PEÑA, CARLO": "#F5CBA7",
+    "RUBIO VALLE, ALEXIS": "#A9DFBF", "YARIN ACHACHAGUA, ANWAR": "#FADBD8",
+    "SALAS PINTO, DIONISIO": "#E6B0AA"
+}
 
 # --- 3. MENÚ LATERAL OCULTO ---
 st.sidebar.markdown("### 🚜 Talleres y Equipos")
@@ -67,10 +84,10 @@ else:
 if st.session_state.admin_mode:
     st.title("⚙️ Panel de Administración")
     
-    opcion_admin = st.radio("Seleccione el módulo:", ["⛽ Panel de Combustible (Excel)", "🗑️ Gestionar Reservas de Profesores"])
+    opcion_admin = st.radio("Seleccione el módulo:", ["⛽ Panel de Combustible", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario"])
     st.markdown("---")
     
-    if opcion_admin == "⛽ Panel de Combustible (Excel)":
+    if opcion_admin == "⛽ Panel de Combustible":
         st.subheader("Estado de Maquinaria en Tiempo Real")
         sheet_id = "13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM"
         csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv"
@@ -83,9 +100,59 @@ if st.session_state.admin_mode:
         except Exception as e:
             st.error("⚠️ No se pudo cargar el Excel. Revisa los permisos en Drive.")
             
-    elif opcion_admin == "🗑️ Gestionar Reservas de Profesores":
+    elif opcion_admin == "🗑️ Gestionar Reservas":
         st.subheader("Borrador de Reservas Activas")
         st.session_state.reservas = st.data_editor(st.session_state.reservas, num_rows="dynamic", use_container_width=True)
+        
+    elif opcion_admin == "🖨️ Exportar Horario":
+        st.subheader("Generar Horario Coloreado para PDF")
+        st.write("Visualiza el horario codificado por colores según cada docente. Haz clic en el botón inferior para descargarlo y guardarlo como PDF.")
+        
+        # Generar código HTML del horario
+        html_table = """
+        <html><head><meta charset="utf-8">
+        <style>
+            table { width: 100%; border-collapse: collapse; font-family: Arial, sans-serif; font-size: 12px; }
+            th { background-color: #006b3f; color: white; border: 1px solid #000; padding: 10px; text-align: center; }
+            td { border: 1px solid #000; padding: 8px; vertical-align: top; width: 16%; }
+            .hora { background-color: #f2f2f2; font-weight: bold; text-align: center; vertical-align: middle; }
+        </style></head><body>
+        <h2 style="text-align: center; color: #006b3f; font-family: Arial;">CRONOGRAMA DE USO DE TALLERES Y EQUIPOS</h2>
+        <table><tr><th>Hora</th>
+        """
+        for d in dias:
+            html_table += f"<th>{d}</th>"
+        html_table += "</tr>"
+        
+        for h in horas:
+            html_table += f"<tr><td class='hora'>{h}</td>"
+            for d in dias:
+                # Buscar reserva para este día y hora
+                reserva = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                if not reserva.empty:
+                    contenido = ""
+                    bg_color = "#ffffff"
+                    for _, r in reserva.iterrows():
+                        prof = r["Profesor"]
+                        bg_color = colores_prof.get(prof, "#ffffff")
+                        contenido += f"<b>{prof}</b><br><i>Ambientes:</i> {r['Ambientes']}<br><i>Equipos:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
+                    html_table += f"<td style='background-color: {bg_color};'>{contenido}</td>"
+                else:
+                    html_table += "<td></td>"
+            html_table += "</tr>"
+            
+        html_table += "</table></body></html>"
+        
+        # Mostrar el horario en la página
+        st.components.v1.html(html_table, height=600, scrolling=True)
+        
+        # Botón para descargar
+        st.download_button(
+            label="📄 Descargar Horario para Imprimir (PDF)",
+            data=html_table,
+            file_name="Horario_Coloreado_Talleres.html",
+            mime="text/html"
+        )
 
 # ==========================================
 # VISTA 2: PÚBLICA PARA PROFESORES
@@ -102,17 +169,13 @@ else:
         matriz = pd.DataFrame(index=horas, columns=dias)
         matriz.fillna("🟢 Libre", inplace=True)
         for _, row in st.session_state.reservas.iterrows():
-            matriz.at[row["Horario"], row["Día"]] = f"🔴 {row['Profesor']}"
+            matriz.at[row["Horario"], row["Día"]] = f"🔴 Ocupado"
         st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
         
         st.subheader("📝 Registrar Separación")
         
-        profesor = st.selectbox("Docente Responsable", [
-            "Prof. Alfredo Rebaza Pino", "Prof. Francisco Rojas Alejandro", 
-            "Prof. Juvenal García Armas", "Prof. Luis Altamirano Chunga", 
-            "Prof. Fredy Cáceres Guerrero", "Prof. Augusto Zingg Rosell", "Prof. Margarita Chevarría"
-        ])
+        profesor = st.selectbox("Docente Responsable", profesores_lista)
         
         st.markdown("##### 1. Elija los Días de Práctica")
         dias_sel = st.multiselect("Seleccione los días que desea separar:", dias)
@@ -142,7 +205,7 @@ else:
                         st.markdown('</div>', unsafe_allow_html=True)
                         
                         reservas_temporales.append({
-                            "Día": d, "Horario": h, "Profesor": profesor.split(" ")[1], 
+                            "Día": d, "Horario": h, "Profesor": profesor, 
                             "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                             "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)",
                             "Materiales": m_sel if m_sel else "(Ninguno)"
@@ -153,7 +216,6 @@ else:
             if reservas_temporales:
                 st.markdown("---")
                 st.markdown("### 👁️ Previsualización de su Horario")
-                st.info("Así quedará su horario registrado en la cuadrícula de la semana. Verifique que no haya errores.")
                 
                 df_horario_visual = pd.DataFrame(index=horas, columns=dias)
                 df_horario_visual.fillna("", inplace=True)
