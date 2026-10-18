@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
 import pytz
+import time
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
 
@@ -27,8 +28,6 @@ if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
 if "reservas" not in st.session_state:
     st.session_state.reservas = pd.DataFrame(columns=["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales"])
-if "mostrar_exito" not in st.session_state:
-    st.session_state.mostrar_exito = False
 
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
@@ -157,11 +156,6 @@ if st.session_state.admin_mode:
 # VISTA 2: PÚBLICA PARA PROFESORES
 # ==========================================
 else:
-    if st.session_state.mostrar_exito:
-        st.balloons()
-        st.success("✅ ¡Guardado satisfactoriamente! El formulario se ha reiniciado y está listo para otra separación.")
-        st.session_state.mostrar_exito = False
-
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
     if formulario_cerrado:
@@ -264,5 +258,14 @@ else:
                             del r["List_Eq"]
                         
                         st.session_state.reservas = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
-                        st.session_state.mostrar_exito = True
+                        
+                        # Generar notificación flotante tipo pestaña
+                        st.toast("✅ ¡Guardado satisfactoriamente!", icon="🎉")
+                        
+                        # Mostrar el mensaje directamente encima del botón
+                        st.success("✅ ¡Guardado satisfactoriamente! El formulario se reiniciará en unos segundos.")
+                        
+                        # Esperar 2.5 segundos para que el usuario pueda leer el mensaje
+                        time.sleep(2.5)
+                        
                         st.rerun()
