@@ -12,7 +12,7 @@ URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwoJ1ELyLOwr1ORFcWUcn
 URL_CSV_USUARIOS = "https://docs.google.com/spreadsheets/d/13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM/export?format=csv&gid=1575432411"
 # ========================================================
 
-st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="SIMA - Intranet Talleres UNALM", layout="wide", initial_sidebar_state="expanded")
 
 # --- FUNCIONES DE BASE DE DATOS (NUBE) ---
 @st.cache_data(ttl=60)
@@ -20,7 +20,6 @@ def cargar_docentes():
     try:
         df = pd.read_csv(URL_CSV_USUARIOS, header=None)
         
-        # Buscar la fila de encabezados correcta
         fila_head = 0
         for idx, row in df.iterrows():
             valores = [str(x).lower().strip() for x in row.values]
@@ -44,12 +43,10 @@ def cargar_docentes():
                 ap_pat = str(r[col_pat]).strip()
                 ap_mat = str(r[col_mat]).strip() if col_mat else ""
                 
-                # Extraer primer nombre y primer apellido para el saludo
                 primer_nombre = nombres.split()[0].title() if nombres else ""
                 primer_apellido = ap_pat.split()[0].title() if ap_pat else ""
                 
                 nombre_saludo = f"{primer_nombre} {primer_apellido}".strip()
-                # Formato oficial para la base de datos: APELLIDO PATERNO APELLIDO MATERNO, NOMBRES
                 nombre_oficial = f"{ap_pat} {ap_mat}, {nombres}".upper().strip()
                 
                 if dni and dni.lower() != "nan":
@@ -94,7 +91,7 @@ def guardar_reservas_en_nube(df):
 
 # --- VARIABLES DE ESTADO DE SESIÓN ---
 if "rol_actual" not in st.session_state:
-    st.session_state.rol_actual = None  # "Admin", "Docente" o None
+    st.session_state.rol_actual = None  
 if "usuario_actual" not in st.session_state:
     st.session_state.usuario_actual = ""
 if "nombre_saludo" not in st.session_state:
@@ -131,25 +128,27 @@ profesores_lista = [
     "ROJAS ALEJANDRO, FRANCISCO", "GARCIA ARMAS, JUVENAL", "ALTAMIRANO CHUNGA, LUIS", 
     "CACERES GUERRERO, FREDY", "CHEVARRIA MOSCOSO, MARGARITA", "REBAZA PINO, ALFREDO", 
     "ZINGG ROSELL, AUGUSTO", "VASQUEZ CACERES, JAIME", "ORELLANA PARDAVE, JOSE", 
-    "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO", "ADMINISTRACIÓN - NORELLY"
+    "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO", "ADMINISTRACIÓN - NORELLY", "ALATA REY, JOSUÉ ELIEZER"
 ]
 
+# --- PALETA DE COLORES ÚNICOS Y DIFERENCIADOS PARA CADA PROFESOR ---
 def obtener_color_profesor(prof_nombre):
     prof_upper = str(prof_nombre).upper()
-    if "ROJAS" in prof_upper: return "#D7BDE2"
-    if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#A3E4D7"
-    if "ALTAMIRANO" in prof_upper: return "#FAD7A0"
-    if "CACERES" in prof_upper or "CÁCERES" in prof_upper: return "#F9E79F"
-    if "CHEVARRIA" in prof_upper or "CHEVARRÍA" in prof_upper: return "#F5B7B1"
-    if "REBAZA" in prof_upper: return "#B4CDE6"
-    if "ZINGG" in prof_upper: return "#C5E0B4"
-    if "ORELLANA" in prof_upper: return "#AED6F1"
-    if "SALAS PEÑA" in prof_upper: return "#F5CBA7"
-    if "SALAS PINTO" in prof_upper: return "#E6B0AA"
-    if "RUBIO" in prof_upper: return "#A9DFBF"
-    if "YARIN" in prof_upper or "YARÍN" in prof_upper: return "#FADBD8"
-    if "NORELLY" in prof_upper: return "#ffcc80"
-    return "#e1bee7" # Color lavanda por defecto para profesores nuevos
+    if "ROJAS" in prof_upper: return "#FFD1DC"          # Rosa pastel suave
+    if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#B5EAD7" # Verde menta claro
+    if "ALTAMIRANO" in prof_upper: return "#FFEAA7"     # Amarillo cálido
+    if "CACERES" in prof_upper or "CÁCERES" in prof_upper: return "#DFCCF1" # Lila claro
+    if "CHEVARRIA" in prof_upper or "CHEVARRÍA" in prof_upper: return "#FFD8B1" # Melocotón
+    if "REBAZA" in prof_upper: return "#C7CEEA"         # Azul periwinkle
+    if "ZINGG" in prof_upper: return "#E2F0CB"          # Verde pistacho suave
+    if "ORELLANA" in prof_upper: return "#A0C4FF"       # Azul cielo vivo
+    if "SALAS PEÑA" in prof_upper: return "#FDFFB6"     # Amarillo claro brillante
+    if "SALAS PINTO" in prof_upper: return "#FF9AA2"    # Coral suave
+    if "RUBIO" in prof_upper: return "#CAFFBF"          # Verde claro brillante
+    if "YARIN" in prof_upper or "YARÍN" in prof_upper: return "#FFC6FF" # Magenta claro
+    if "NORELLY" in prof_upper: return "#FFB703"        # Ámbar / Dorado
+    if "ALATA" in prof_upper: return "#9BF6FF"          # Turquesa claro
+    return "#E5E5E5"                                    # Gris neutro por defecto
 
 # --- ESTILO VISUAL ---
 st.markdown("""
@@ -167,7 +166,6 @@ st.markdown("""
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
     div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
     
-    /* CAJA RESALTADA PARA LA SESIÓN ACTIVA EN EL MENÚ */
     .caja-sesion {
         background-color: #e8f5e9;
         color: #006b3f;
@@ -180,7 +178,6 @@ st.markdown("""
         box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
     
-    /* SALUDO CORREGIDO PARA QUE NO SE CORTE LA CURSIVA (PADDING AÑADIDO) */
     .saludo-ios {
         font-family: 'Grand Hotel', cursive;
         font-size: 55px; 
@@ -191,7 +188,7 @@ st.markdown("""
         margin-top: -20px; 
         margin-bottom: 35px; 
         line-height: 1.3;
-        padding: 5px 25px 5px 5px; /* Evita que el borde derecho corte las letras */
+        padding: 5px 25px 5px 5px; 
         display: inline-block;
     }
     
@@ -222,8 +219,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- MENÚ LATERAL DE AUTENTICACIÓN ---
-st.sidebar.markdown("### 🚜 Talleres y Equipos")
-st.sidebar.markdown("Sistema Oficial de Separación.")
+st.sidebar.markdown("### 🚜 SIMA - UNALM")
+st.sidebar.markdown("Sistema de Maquinaria Agrícola.")
 st.sidebar.markdown("<br><br><br>", unsafe_allow_html=True)
 
 if st.session_state.rol_actual:
@@ -244,14 +241,12 @@ if st.session_state.rol_actual:
         st.rerun()
 else:
     st.sidebar.markdown("### 🔐 Acceso al Sistema")
-    # EL AVISO DE DNI HA SIDO ELIMINADO POR SEGURIDAD
     usuario_input = st.sidebar.text_input("Usuario")
     clave_input = st.sidebar.text_input("Contraseña", type="password")
     
     if st.sidebar.button("Entrar"):
         docentes_dict = cargar_docentes()
         
-        # Validar Super Admin Exclusivo (Norelly)
         if usuario_input == "Norelly2026" and clave_input == "Pool2026":
             st.session_state.rol_actual = "Admin"
             st.session_state.usuario_actual = "Norelly2026"
@@ -259,11 +254,9 @@ else:
             st.session_state.nombre_oficial = "ADMINISTRACIÓN - NORELLY"
             st.rerun()
             
-        # Validar Docentes y al Ing. Orellana mediante DNI en el Excel
         elif usuario_input == clave_input and usuario_input in docentes_dict:
             datos_doc = docentes_dict[usuario_input]
             
-            # Si el DNI le pertenece a José Antonio Orellana, entra como Admin
             if usuario_input == "41264537": 
                 st.session_state.rol_actual = "Admin"
             else:
@@ -281,13 +274,12 @@ else:
 # ==========================================
 if st.session_state.rol_actual == "Admin":
     
-    # Saludo Personalizado para Administradores
     if st.session_state.usuario_actual == "Norelly2026":
         st.markdown(f'<div class="saludo-ios">Bienvenida Ing. {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="saludo-ios">Bienvenido Ing. {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
         
-    st.title("⚙️ Panel de Control Administrativo")
+    st.title("⚙️ Panel de Control Administrativo - SIMA")
     
     sheet_id = "13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM"
     csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=58572181"
@@ -328,7 +320,6 @@ if st.session_state.rol_actual == "Admin":
     except Exception as e:
         error_excel = e
 
-    # LA VISTA DE ADMINISTRADOR AHORA TIENE 5 PESTAÑAS PARA INCLUIR LAS RESERVAS
     tab_maquinaria, tab_evidencias, tab_reservas, tab_horario, tab_hacer_reserva = st.tabs([
         "🚜 Control Visual", "📸 Evidencias", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario", "📝 Hacer Reserva"
     ])
@@ -465,37 +456,51 @@ if st.session_state.rol_actual == "Admin":
             
     with tab_horario:
         st.subheader(f"Generar Horario Coloreado para PDF ({str_semana})")
+        
+        # --- TABLA HTML MEJORADA CON TARJETAS INDEPENDIENTES POR PROFESOR ---
         html_table = f"""<html><head><meta charset="utf-8">
-        <style>table {{ width: 100%; border-collapse: collapse; font-family: Arial; font-size: 12px; }}
-        th {{ background-color: #006b3f; color: white; border: 1px solid #000; padding: 10px; text-align: center; }}
-        td {{ border: 1px solid #000; padding: 8px; vertical-align: top; width: 16%; }}
-        .hora {{ background-color: #f2f2f2; font-weight: bold; text-align: center; vertical-align: middle; }}</style></head><body>
-        <h2 style="text-align: center; color: #006b3f; font-family: Arial;">CRONOGRAMA DE USO DE TALLERES Y EQUIPOS</h2>
+        <style>
+            table {{ width: 100%; border-collapse: collapse; font-family: Arial; font-size: 12px; }}
+            th {{ background-color: #006b3f; color: white; border: 1px solid #000; padding: 10px; text-align: center; }}
+            td {{ border: 1px solid #000; padding: 6px; vertical-align: top; width: 16%; }}
+            .hora {{ background-color: #f2f2f2; font-weight: bold; text-align: center; vertical-align: middle; }}
+            .tarjeta-reserva {{ padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(0,0,0,0.15); }}
+        </style></head><body>
+        <h2 style="text-align: center; color: #006b3f; font-family: Arial;">CRONOGRAMA DE USO DE TALLERES Y EQUIPOS - SIMA</h2>
         <h4 style='text-align: center; color: #333; font-family: Arial;'>{str_semana}</h4><table><tr><th>Hora</th>"""
+        
         for d in dias: html_table += f"<th>{d}</th>"
         html_table += "</tr>"
+        
         for h in horas:
             html_table += f"<tr><td class='hora'>{h}</td>"
             for d in dias:
                 reserva = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
                 if not reserva.empty:
                     contenido = ""
-                    bg_color = "#ffffff"
                     for _, r in reserva.iterrows():
                         prof = r["Profesor"]
-                        bg_color = obtener_color_profesor(prof) 
+                        bg_color = obtener_color_profesor(prof) # Color único por profesor
                         fecha_reg = f"<small style='color:#555;'>({r.get('Fecha/Hora Registro', '')})</small><br>" if r.get('Fecha/Hora Registro', '') else ""
                         op_tag = " <b style='color:#b71c1c;'>[Requiere Operario]</b>" if r.get("Operario", "") == "Sí" else ""
-                        contenido += f"<b>{prof}</b>{op_tag}<br>{fecha_reg}<i>Amb.:</i> {r['Ambientes']}<br><i>Eq.:</i> {r['Equipos']}<br><hr style='margin:4px 0;'>"
-                    html_table += f"<td style='background-color: {bg_color};'>{contenido}</td>"
-                else: html_table += "<td></td>"
+                        
+                        contenido += f"""
+                        <div class="tarjeta-reserva" style="background-color: {bg_color};">
+                            <b>{prof}</b>{op_tag}<br>
+                            {fecha_reg}
+                            <i>Amb.:</i> {r['Ambientes']}<br>
+                            <i>Eq.:</i> {r['Equipos']}
+                        </div>"""
+                    html_table += f"<td>{contenido}</td>"
+                else: 
+                    html_table += "<td></td>"
             html_table += "</tr>"
         html_table += "</table></body></html>"
+        
         st.components.v1.html(html_table, height=600, scrolling=True)
         st.download_button("📄 Descargar Horario (PDF)", html_table, "Horario_Coloreado.html", "text/html")
 
     with tab_hacer_reserva:
-        # --- AQUÍ ESTÁ EL CÓDIGO COMPLETO DE RESERVAS PARA ADMINISTRADORES ---
         st.subheader("🗓️ Separación Semanal de Ambientes y Equipos")
         
         if st.session_state.mostrar_exito:
@@ -529,7 +534,6 @@ if st.session_state.rol_actual == "Admin":
             
             st.subheader("📝 Formulario de Registro de Separación")
             
-            # COMO ADMIN, NORELLY PUEDE ELEGIR POR OTROS. ORELLANA ESTÁ BLOQUEADO A SU NOMBRE.
             if st.session_state.usuario_actual == "Norelly2026":
                 profesor = st.selectbox("Docente Responsable (Modo Administrador)", profesores_lista, key=f"prof_{st.session_state.form_key}")
             else:
@@ -583,7 +587,6 @@ if st.session_state.rol_actual == "Admin":
                             })
                     st.markdown('</div>', unsafe_allow_html=True)
                 
-                # --- PREVISUALIZACIÓN VISUAL RESTAURADA EXACTAMENTE COMO ANTES ---
                 if reservas_temporales:
                     st.markdown("---")
                     st.markdown("### 👁️ Previsualización de su Horario")
@@ -638,7 +641,6 @@ if st.session_state.rol_actual == "Admin":
 # ==========================================
 elif st.session_state.rol_actual == "Docente":
 
-    # Saludo Personalizado para Docentes
     st.markdown(f'<div class="saludo-ios">Bienvenido Ing. {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
     
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
@@ -657,7 +659,6 @@ elif st.session_state.rol_actual == "Docente":
                 st.session_state.reservas = cargar_reservas()
             st.rerun()
             
-        # --- TABLA DE HORARIOS OCUPADOS RESTAURADA AL INICIO ---
         st.subheader("📊 Recursos Ocupados en Tiempo Real")
         matriz = pd.DataFrame(index=horas, columns=dias)
         matriz.fillna("🟢 Libre", inplace=True)
@@ -675,7 +676,6 @@ elif st.session_state.rol_actual == "Docente":
         
         st.subheader("📝 Formulario de Registro de Separación")
         
-        # EL NOMBRE DEL PROFESOR AHORA ESTÁ BLOQUEADO Y SE TOMA DEL LOGIN
         st.text_input("Docente Responsable (Autocompletado)", value=st.session_state.nombre_oficial, disabled=True)
         profesor = st.session_state.nombre_oficial
         
@@ -726,7 +726,6 @@ elif st.session_state.rol_actual == "Docente":
                         })
                 st.markdown('</div>', unsafe_allow_html=True)
             
-            # --- PREVISUALIZACIÓN VISUAL RESTAURADA EXACTAMENTE COMO ANTES ---
             if reservas_temporales:
                 st.markdown("---")
                 st.markdown("### 👁️ Previsualización de su Horario")
@@ -779,8 +778,9 @@ elif st.session_state.rol_actual == "Docente":
 # VISTA 3: PÚBLICA (SIN LOGUEARSE)
 # ==========================================
 else:
-    st.title("🚜 Intranet de Talleres UNALM")
-    st.markdown("### Bienvenido al Sistema Oficial de Separación de Maquinaria")
+    st.title("🚜 SIMA - Intranet de Talleres UNALM")
+    st.markdown("### Sistema Oficial de Separación de Maquinaria")
+    st.info("👈 Por favor, ingrese sus credenciales en el menú lateral izquierdo para acceder a su perfil y separar recursos.")
     
     st.subheader("📊 Disponibilidad en Tiempo Real")
     st.write(f"Estado general de los talleres para la **{str_semana}**")
