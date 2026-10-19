@@ -112,12 +112,42 @@ colores_prof = {
 # --- ESTILO VISUAL ---
 st.markdown("""
     <style>
+    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+    
     [data-testid="stSidebar"] { background-color: #006b3f !important; }
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
     [data-testid="stSidebar"] label p { color: white !important; }
     input { color: black !important; background-color: white !important; }
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
     div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
+    
+    /* RESALTADO CLARO PARA EL EXPANDER DEL MENU LATERAL */
+    [data-testid="stSidebar"] [data-testid="stExpander"] {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        background-color: rgba(255, 255, 255, 0.2) !important;
+        border-radius: 10px;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary p {
+        color: white !important;
+        font-weight: bold;
+    }
+    
+    /* ESTILO APPLE IOS "HELLO" PARA EL SALUDO */
+    .saludo-ios {
+        font-family: 'Dancing Script', cursive;
+        font-size: 55px;
+        font-weight: 700;
+        background: linear-gradient(90deg, #007AFF 0%, #AF52DE 25%, #FF2D55 50%, #FF9500 75%, #34C759 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: -15px;
+        margin-top: 10px;
+        line-height: 1.2;
+    }
     
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
@@ -129,14 +159,13 @@ st.markdown("""
     .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
     .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
     
-    /* AQUI ESTÁN LOS TAMAÑOS MÁS GRANDES PARA LAS PESTAÑAS */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #f0f2f6;
         border-radius: 8px 8px 0px 0px;
-        padding: 15px 30px !important; /* Más grandes */
+        padding: 15px 30px !important;
         font-weight: bold !important;
-        font-size: 18px !important; /* Letra más grande */
+        font-size: 18px !important;
     }
     .stTabs [aria-selected="true"] { 
         background-color: #006b3f !important; 
@@ -173,11 +202,11 @@ else:
 # ==========================================
 if st.session_state.admin_mode:
     
-    # --- SALUDO ELEGANTE EN CURSIVA ARRIBA DEL TÍTULO ---
+    # --- SALUDO ESTILO APPLE IOS "HELLO" ---
     if st.session_state.usuario_actual == "Norelly2026":
-        st.markdown("*Bienvenida Norelly*")
+        st.markdown('<div class="saludo-ios">Bienvenida Norelly</div>', unsafe_allow_html=True)
     elif st.session_state.usuario_actual == "Orellana2026":
-        st.markdown("*Bienvenido Ing Orellana*")
+        st.markdown('<div class="saludo-ios">Bienvenido Ing Orellana</div>', unsafe_allow_html=True)
         
     st.title("⚙️ Panel de Control Administrativo")
     
