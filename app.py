@@ -145,6 +145,20 @@ st.markdown("""
     }
     [data-testid="stSidebar"] [data-testid="stExpander"] summary p { color: white !important; font-weight: bold; }
     
+    /* CAJA RESALTADA PARA LA SESIÓN ACTIVA */
+    .caja-sesion {
+        background-color: #ffffff;
+        color: #006b3f;
+        padding: 15px;
+        border-radius: 10px;
+        font-weight: bold;
+        text-align: center;
+        margin-bottom: 20px;
+        border: 3px solid #69f0ae;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    /* SALUDO CORREGIDO PARA QUE NO SE CORTE LA CURSIVA */
     .saludo-ios {
         font-family: 'Grand Hotel', cursive;
         font-size: 55px; 
@@ -154,7 +168,9 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         margin-top: -20px; 
         margin-bottom: 35px; 
-        line-height: 1.2;
+        line-height: 1.3;
+        padding: 10px 20px 10px 5px; /* Evita que los bordes corten las letras */
+        display: inline-block;
     }
     
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
@@ -191,11 +207,11 @@ st.sidebar.markdown("<br><br><br>", unsafe_allow_html=True)
 if st.session_state.rol_actual:
     if st.session_state.rol_actual == "Admin":
         if st.session_state.usuario_actual == "Norelly2026":
-            st.sidebar.success("👑 Acceso: Super Admin (Norelly)")
+            st.sidebar.markdown('<div class="caja-sesion">👑 Super Admin<br><span style="color:#555; font-size:16px;">Ing. Norelly</span></div>', unsafe_allow_html=True)
         else:
-            st.sidebar.success("👑 Acceso: Super Admin (Orellana)")
+            st.sidebar.markdown('<div class="caja-sesion">👑 Super Admin<br><span style="color:#555; font-size:16px;">Ing. Orellana</span></div>', unsafe_allow_html=True)
     elif st.session_state.rol_actual == "Docente":
-        st.sidebar.success("👨‍🏫 Sesión activa (Docente)")
+        st.sidebar.markdown('<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Perfil Docente</span></div>', unsafe_allow_html=True)
         
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     if st.sidebar.button("Cerrar Sesión"):
@@ -205,8 +221,8 @@ if st.session_state.rol_actual:
         st.rerun()
 else:
     st.sidebar.markdown("### 🔐 Acceso al Sistema")
-    st.sidebar.info("Para separar recursos, ingrese sus credenciales.\n\n**Docentes:** Utilicen su **DNI** como Usuario y Contraseña.")
-    usuario_input = st.sidebar.text_input("Usuario (DNI para docentes)")
+    st.sidebar.info("Ingrese sus credenciales de acceso.")
+    usuario_input = st.sidebar.text_input("Usuario")
     clave_input = st.sidebar.text_input("Contraseña", type="password")
     
     if st.sidebar.button("Entrar"):
@@ -219,14 +235,14 @@ else:
             st.session_state.usuario_actual = usuario_input
             st.rerun()
             
-        # Validar Docentes (DNI == Contraseña y DNI existe en Sheets)
+        # Validar Docentes
         elif usuario_input == clave_input and usuario_input in docentes_dict:
             st.session_state.rol_actual = "Docente"
             st.session_state.usuario_actual = usuario_input
             st.session_state.nombre_profesor = docentes_dict[usuario_input]
             st.rerun()
         else:
-            st.sidebar.error("Usuario o contraseña incorrectos. Si es docente, verifique que su DNI esté registrado en la base de datos.")
+            st.sidebar.error("Usuario o contraseña incorrectos.")
 
 # ==========================================
 # VISTA 1: ADMINISTRADOR (CONTROL TOTAL)
@@ -234,9 +250,9 @@ else:
 if st.session_state.rol_actual == "Admin":
     
     if st.session_state.usuario_actual == "Norelly2026":
-        st.markdown('<div class="saludo-ios">Bienvenida Norelly</div>', unsafe_allow_html=True)
+        st.markdown('<div class="saludo-ios">Bienvenida Ing. Norelly</div>', unsafe_allow_html=True)
     elif st.session_state.usuario_actual == "Orellana2026":
-        st.markdown('<div class="saludo-ios">Bienvenido Ing Orellana</div>', unsafe_allow_html=True)
+        st.markdown('<div class="saludo-ios">Bienvenido Ing. Orellana</div>', unsafe_allow_html=True)
         
     st.title("⚙️ Panel de Control Administrativo")
     
@@ -481,7 +497,21 @@ elif st.session_state.rol_actual == "Docente":
                 st.session_state.reservas = cargar_reservas()
             st.rerun()
             
+        st.subheader("📊 Recursos Ocupados en Tiempo Real")
+        matriz = pd.DataFrame(index=horas, columns=dias)
+        matriz.fillna("🟢 Libre", inplace=True)
+        for d in dias:
+            for h in horas:
+                acts = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                if not acts.empty:
+                    ocupados = []
+                    for _, r in acts.iterrows():
+                        if str(r["Ambientes"]) != "(Ninguno)": ocupados.append(str(r["Ambientes"]))
+                        if str(r["Equipos"]) != "(Ninguno)": ocupados.append(str(r["Equipos"]))
+                    matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
+        st.dataframe(matriz, use_container_width=True)
         st.markdown("---")
+        
         st.subheader("📝 Formulario de Registro de Separación")
         
         # EL NOMBRE DEL PROFESOR AHORA ESTÁ BLOQUEADO Y SE TOMA DEL LOGIN
@@ -537,10 +567,21 @@ elif st.session_state.rol_actual == "Docente":
             
             if reservas_temporales:
                 st.markdown("---")
-                st.markdown("### 👁️ Resumen de la Selección")
+                st.markdown("### 👁️ Previsualización de su Horario")
+                st.info("Verifique su horario. Lo reservado por otros aparece en ROJO. Su separación actual resalta en AZUL.")
+                
+                df_horario_visual = matriz.copy()
                 for res in reservas_temporales:
                     tag_op = " [Operario: SÍ]" if res["Operario"] == "Sí" else ""
-                    st.info(f"**{res['Día']} a las {res['Horario']}** | Amb: {res['Ambientes']} | Eq: {res['Equipos']}{tag_op}")
+                    texto_celda_azul = f"🔵 SU SELECCIÓN:\nAmb: {res['Ambientes']}\nEq: {res['Equipos']}{tag_op}"
+                    actual = df_horario_visual.at[res["Horario"], res["Día"]]
+                    
+                    if "🟢" in str(actual): 
+                        df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda_azul
+                    else: 
+                        df_horario_visual.at[res["Horario"], res["Día"]] = str(actual) + "\n\n" + texto_celda_azul
+                        
+                st.table(df_horario_visual)
                 
                 placeholder_exito = st.empty()
                 if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
