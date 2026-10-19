@@ -8,7 +8,6 @@ import requests
 import json
 
 # === ENLACE OFICIAL DE LA BASE DE DATOS EN GOOGLE SHEETS ===
-# PEGA AQUÍ TU NUEVO ENLACE DESPUÉS DE HACER "NUEVA IMPLEMENTACIÓN" EN GOOGLE
 URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwoJ1ELyLOwr1ORFcWUcnwrcQpsyKj-6_0obweEBnq9P8HqdLlNQCAe8IDMdk8R4nIR/exec"
 # ========================================================
 
@@ -828,3 +827,4 @@ else:
                                 st.rerun()
                             else: 
                                 st.error("Hubo un error guardando en Google Sheets. Revisa el enlace y tu conexión.")
+```<FollowUp></FollowUp>
