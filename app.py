@@ -112,12 +112,13 @@ colores_prof = {
 # --- ESTILO VISUAL ---
 st.markdown("""
     <style>
-    @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
+    /* FUENTE REDONDEADA Y ELEGANTE (TIPO GRAND HOTEL) */
+    @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
     
     /* HACER LA BARRA LATERAL MÁS ANCHA */
     section[data-testid="stSidebar"] { 
-        width: 400px !important;
-        min-width: 400px !important;
+        width: 380px !important;
+        min-width: 380px !important;
         background-color: #006b3f !important; 
     }
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
@@ -141,16 +142,16 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* ESTILO CURSIVO Y DEGRADADO VERDE (OSCURO A CLARO) PARA EL SALUDO */
+    /* SALUDO REDONDEADO CON DEGRADADO VERDE */
     .saludo-ios {
-        font-family: 'Dancing Script', cursive;
-        font-size: 38px; /* Tamaño reducido */
-        font-weight: 700;
-        background: linear-gradient(90deg, #002b12 0%, #008f4c 50%, #81c784 100%); /* Tonos verdes de oscuro a claro */
+        font-family: 'Grand Hotel', cursive;
+        font-size: 55px; /* Tamaño ideal para esta fuente redondeada */
+        font-weight: 400;
+        background: linear-gradient(90deg, #002b12 0%, #008f4c 50%, #69f0ae 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-top: -30px; /* Empujado más arriba */
-        margin-bottom: 35px; /* Espacio amplio antes del panel de control */
+        margin-top: -20px; 
+        margin-bottom: 35px; /* Espacio amplio antes del título del panel */
         line-height: 1.2;
     }
     
@@ -164,20 +165,26 @@ st.markdown("""
     .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
     .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
     
-    /* ESTILOS DE PESTAÑAS MEJORADOS */
-    .stTabs [data-baseweb="tab-list"] { gap: 10px; }
+    /* ESTILOS DE PESTAÑAS (CORRECCIÓN PARA QUE NO SE CORTEN) */
+    .stTabs [data-baseweb="tab-list"] { gap: 15px; overflow-x: visible !important; }
     .stTabs [data-baseweb="tab"] {
         background-color: #f0f2f6;
         border-radius: 8px 8px 0px 0px;
         padding: 12px 25px !important;
         font-weight: bold !important;
         font-size: 17px !important;
-        white-space: nowrap; 
+        min-width: fit-content !important; /* Fuerza a la pestaña a ensancharse */
+        white-space: nowrap !important; /* Evita que se divida en dos líneas */
+        overflow: visible !important; /* Evita que se oculte el texto */
+    }
+    .stTabs [data-baseweb="tab"] span {
+        overflow: visible !important;
+        white-space: nowrap !important;
     }
     .stTabs [aria-selected="true"] { 
         background-color: #006b3f !important; 
         color: white !important; 
-        border-bottom: 4px solid #81c784 !important; 
+        border-bottom: 4px solid #69f0ae !important; 
     }
     </style>
 """, unsafe_allow_html=True)
@@ -210,7 +217,7 @@ else:
 # ==========================================
 if st.session_state.admin_mode:
     
-    # --- SALUDO CURSIVO Y DEGRADADO VERDE ---
+    # --- SALUDO CURSIVO Y REDONDEADO (TIPO GRAND HOTEL) ---
     if st.session_state.usuario_actual == "Norelly2026":
         st.markdown('<div class="saludo-ios">Bienvenida Norelly</div>', unsafe_allow_html=True)
     elif st.session_state.usuario_actual == "Orellana2026":
