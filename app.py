@@ -8,7 +8,7 @@ import requests
 import json
 
 # === ENLACE OFICIAL DE LA BASE DE DATOS EN GOOGLE SHEETS ===
-URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwoJ1ELyLOwr1ORFcWUcnwrcQpsyKj-6_0obweEBnq9P8HqdLlNQCAe8IDMdk8R4nIR/exec"
+URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwodCUKKTc0M1zY23bzMN3TZbsrH4BzwV32JcrSuUpv6_YTTuswbmhlk1IU8Dk4jA77/exec"
 # ========================================================
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
