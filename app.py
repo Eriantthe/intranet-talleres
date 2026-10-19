@@ -8,7 +8,7 @@ import requests
 import json
 
 # === ENLACE OFICIAL DE LA BASE DE DATOS EN GOOGLE SHEETS ===
-URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwodCUKKTc0M1zY23bzMN3TZbsrH4BzwV32JcrSuUpv6_YTTuswbmhlk1IU8Dk4jA77/exec"
+URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwoJ1ELyLOwr1ORFcWUcnwrcQpsyKj-6_0obweEBnq9P8HqdLlNQCAe8IDMdk8R4nIR/exec"
 # ========================================================
 
 st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
@@ -48,6 +48,9 @@ def guardar_reservas_en_nube(df):
 # --- VARIABLES DE ESTADO ---
 if "admin_mode" not in st.session_state:
     st.session_state.admin_mode = False
+
+if "usuario_actual" not in st.session_state:
+    st.session_state.usuario_actual = ""
 
 if "form_key" not in st.session_state:
     st.session_state.form_key = 0
@@ -146,16 +149,31 @@ st.sidebar.markdown("Sistema Oficial de Separación.")
 st.sidebar.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
 if st.session_state.admin_mode:
-    st.sidebar.success("✅ Modo Admin Activo")
+    # --- MENSAJE PERSONALIZADO SEGÚN EL USUARIO ---
+    if st.session_state.usuario_actual == "Norelly2026":
+        st.sidebar.success("✅ Bienvenida Norelly")
+    elif st.session_state.usuario_actual == "Orellana2026":
+        st.sidebar.success("✅ Bienvenido Ing Orellana")
+    else:
+        st.sidebar.success("✅ Admin Activo")
+        
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.admin_mode = False
+        st.session_state.usuario_actual = ""
         st.rerun()
 else:
     with st.sidebar.expander("🔑 Acceso Administrador"):
-        clave = st.text_input("Contraseña", type="password")
-        if st.button("Entrar") and clave == "orellana2026":
-            st.session_state.admin_mode = True
-            st.rerun()
+        usuario_input = st.text_input("Usuario")
+        clave_input = st.text_input("Contraseña", type="password")
+        if st.button("Entrar"):
+            # --- VALIDACIÓN DE USUARIOS ACTUALIZADA ---
+            if (usuario_input == "Norelly2026" and clave_input == "Pool2026") or \
+               (usuario_input == "Orellana2026" and clave_input == "Pool2026"):
+                st.session_state.admin_mode = True
+                st.session_state.usuario_actual = usuario_input
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos")
 
 # ==========================================
 # VISTA 1: ADMINISTRADOR
