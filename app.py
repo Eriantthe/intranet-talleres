@@ -11,7 +11,7 @@ import json
 URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwoJ1ELyLOwr1ORFcWUcnwrcQpsyKj-6_0obweEBnq9P8HqdLlNQCAe8IDMdk8R4nIR/exec"
 # ========================================================
 
-st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide")
+st.set_page_config(page_title="Intranet Talleres UNALM", layout="wide", initial_sidebar_state="expanded")
 
 # --- FUNCIONES DE BASE DE DATOS (NUBE) ---
 def cargar_reservas():
@@ -114,7 +114,12 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&display=swap');
     
-    [data-testid="stSidebar"] { background-color: #006b3f !important; }
+    /* HACER LA BARRA LATERAL MÁS ANCHA */
+    section[data-testid="stSidebar"] { 
+        width: 400px !important;
+        min-width: 400px !important;
+        background-color: #006b3f !important; 
+    }
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
     [data-testid="stSidebar"] label p { color: white !important; }
     input { color: black !important; background-color: white !important; }
@@ -136,16 +141,16 @@ st.markdown("""
         font-weight: bold;
     }
     
-    /* ESTILO APPLE IOS "HELLO" PARA EL SALUDO */
+    /* ESTILO CURSIVO Y DEGRADADO VERDE (OSCURO A CLARO) PARA EL SALUDO */
     .saludo-ios {
         font-family: 'Dancing Script', cursive;
-        font-size: 55px;
+        font-size: 38px; /* Tamaño reducido */
         font-weight: 700;
-        background: linear-gradient(90deg, #007AFF 0%, #AF52DE 25%, #FF2D55 50%, #FF9500 75%, #34C759 100%);
+        background: linear-gradient(90deg, #002b12 0%, #008f4c 50%, #81c784 100%); /* Tonos verdes de oscuro a claro */
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        margin-bottom: -15px;
-        margin-top: 10px;
+        margin-top: -30px; /* Empujado más arriba */
+        margin-bottom: 35px; /* Espacio amplio antes del panel de control */
         line-height: 1.2;
     }
     
@@ -159,17 +164,20 @@ st.markdown("""
     .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
     .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
     
+    /* ESTILOS DE PESTAÑAS MEJORADOS */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #f0f2f6;
         border-radius: 8px 8px 0px 0px;
-        padding: 15px 30px !important;
+        padding: 12px 25px !important;
         font-weight: bold !important;
-        font-size: 18px !important;
+        font-size: 17px !important;
+        white-space: nowrap; 
     }
     .stTabs [aria-selected="true"] { 
         background-color: #006b3f !important; 
         color: white !important; 
+        border-bottom: 4px solid #81c784 !important; 
     }
     </style>
 """, unsafe_allow_html=True)
@@ -202,7 +210,7 @@ else:
 # ==========================================
 if st.session_state.admin_mode:
     
-    # --- SALUDO ESTILO APPLE IOS "HELLO" ---
+    # --- SALUDO CURSIVO Y DEGRADADO VERDE ---
     if st.session_state.usuario_actual == "Norelly2026":
         st.markdown('<div class="saludo-ios">Bienvenida Norelly</div>', unsafe_allow_html=True)
     elif st.session_state.usuario_actual == "Orellana2026":
