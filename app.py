@@ -129,12 +129,14 @@ st.markdown("""
     .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
     .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
     
+    /* AQUI ESTÁN LOS TAMAÑOS MÁS GRANDES PARA LAS PESTAÑAS */
     .stTabs [data-baseweb="tab-list"] { gap: 10px; }
     .stTabs [data-baseweb="tab"] {
         background-color: #f0f2f6;
         border-radius: 8px 8px 0px 0px;
-        padding: 10px 20px;
-        font-weight: bold;
+        padding: 15px 30px !important; /* Más grandes */
+        font-weight: bold !important;
+        font-size: 18px !important; /* Letra más grande */
     }
     .stTabs [aria-selected="true"] { 
         background-color: #006b3f !important; 
@@ -149,14 +151,6 @@ st.sidebar.markdown("Sistema Oficial de Separación.")
 st.sidebar.markdown("<br><br><br><br><br><br>", unsafe_allow_html=True)
 
 if st.session_state.admin_mode:
-    # --- MENSAJE PERSONALIZADO SEGÚN EL USUARIO ---
-    if st.session_state.usuario_actual == "Norelly2026":
-        st.sidebar.success("✅ Bienvenida Norelly")
-    elif st.session_state.usuario_actual == "Orellana2026":
-        st.sidebar.success("✅ Bienvenido Ing Orellana")
-    else:
-        st.sidebar.success("✅ Admin Activo")
-        
     if st.sidebar.button("Cerrar Sesión"):
         st.session_state.admin_mode = False
         st.session_state.usuario_actual = ""
@@ -166,7 +160,6 @@ else:
         usuario_input = st.text_input("Usuario")
         clave_input = st.text_input("Contraseña", type="password")
         if st.button("Entrar"):
-            # --- VALIDACIÓN DE USUARIOS ACTUALIZADA ---
             if (usuario_input == "Norelly2026" and clave_input == "Pool2026") or \
                (usuario_input == "Orellana2026" and clave_input == "Pool2026"):
                 st.session_state.admin_mode = True
@@ -179,6 +172,13 @@ else:
 # VISTA 1: ADMINISTRADOR
 # ==========================================
 if st.session_state.admin_mode:
+    
+    # --- SALUDO ELEGANTE EN CURSIVA ARRIBA DEL TÍTULO ---
+    if st.session_state.usuario_actual == "Norelly2026":
+        st.markdown("*Bienvenida Norelly*")
+    elif st.session_state.usuario_actual == "Orellana2026":
+        st.markdown("*Bienvenido Ing Orellana*")
+        
     st.title("⚙️ Panel de Control Administrativo")
     
     # --- CARGA CENTRALIZADA DE DATOS DE MAQUINARIA ---
