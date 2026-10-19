@@ -827,4 +827,3 @@ else:
                                 st.rerun()
                             else: 
                                 st.error("Hubo un error guardando en Google Sheets. Revisa el enlace y tu conexión.")
-```<FollowUp></FollowUp>
