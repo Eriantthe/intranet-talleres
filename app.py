@@ -63,13 +63,19 @@ def cargar_reservas():
         r = requests.get(URL_APPS_SCRIPT, timeout=10)
         data = r.json()
         if len(data) > 0:
-            return pd.DataFrame(data)
+            df = pd.DataFrame(data)
+            # Asegurar que existan las columnas de auditoría para "Baja Lógica"
+            if "Estado" not in df.columns: df["Estado"] = "Activa"
+            if "Eliminado_por" not in df.columns: df["Eliminado_por"] = ""
+            if "Fecha_Eliminacion" not in df.columns: df["Fecha_Eliminacion"] = ""
+            return df
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
         
     return pd.DataFrame(columns=[
         "Día", "Horario", "Profesor", "Ambientes", 
-        "Equipos", "Materiales", "Operario", "Fecha/Hora Registro"
+        "Equipos", "Materiales", "Operario", "Fecha/Hora Registro",
+        "Estado", "Eliminado_por", "Fecha_Eliminacion"
     ])
 
 def guardar_reservas_en_nube(df):
@@ -149,7 +155,7 @@ def obtener_color_profesor(prof_nombre):
     if "ALATA" in prof_upper: return "#9BF6FF"          
     return "#E5E5E5"                                    
 
-# --- ESTILO VISUAL Y ADAPTACIÓN MÓVIL (RESPONSIVE) ---
+# --- ESTILO VISUAL Y ADAPTACIÓN MÓVIL ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
@@ -215,7 +221,6 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] span { overflow: visible !important; white-space: nowrap !important; }
     .stTabs [aria-selected="true"] { background-color: #006b3f !important; color: white !important; border-bottom: 4px solid #69f0ae !important; }
 
-    /* CORRECCIÓN PARA CELULARES */
     @media (max-width: 768px) {
         section[data-testid="stSidebar"] {
             width: 100% !important;
@@ -224,6 +229,12 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
+
+# FILTRO GLOBAL DE RESERVAS ACTIVAS (Oculta las eliminadas en toda la interfaz pública)
+if not st.session_state.reservas.empty and "Estado" in st.session_state.reservas.columns:
+    df_validas = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"]
+else:
+    df_validas = st.session_state.reservas
 
 # --- MENÚ LATERAL DE AUTENTICACIÓN ---
 st.sidebar.markdown("### 🚜 SIMA - UNALM")
@@ -448,18 +459,49 @@ if st.session_state.rol_actual == "Admin":
 
     with tab_reservas:
         st.subheader("Borrador de Reservas Activas")
-        df_admin = st.session_state.reservas.copy()
+        
+        # --- LÓGICA DE BAJA LÓGICA (SOFT DELETE) PARA PROTEGER EL EXCEL ---
+        if "Estado" not in st.session_state.reservas.columns:
+            st.session_state.reservas["Estado"] = "Activa"
+            st.session_state.reservas["Eliminado_por"] = ""
+            st.session_state.reservas["Fecha_Eliminacion"] = ""
+            
+        df_activas = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"].copy()
+        
         columnas_orden = ["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
-        df_admin = df_admin[[c for c in columnas_orden if c in df_admin.columns]]
-        df_admin.insert(0, "❌ Borrar", False)
-        df_editado = st.data_editor(df_admin, hide_index=True, use_container_width=True)
+        df_mostrar = df_activas[[c for c in columnas_orden if c in df_activas.columns]].copy()
+        df_mostrar.insert(0, "❌ Borrar", False)
+        
+        df_editado = st.data_editor(df_mostrar, use_container_width=True)
+        
         if st.button("🗑️ Procesar Eliminaciones en la Nube"):
-            with st.spinner('⏳ Borrando registros en la nube...'):
-                st.session_state.reservas = df_editado[df_editado["❌ Borrar"] == False].drop(columns=["❌ Borrar"])
-                guardar_reservas_en_nube(st.session_state.reservas)
-                st.success("Reservas borradas del sistema.")
-                time.sleep(2)
-                st.rerun()
+            with st.spinner('⏳ Archivando registros en la nube...'):
+                borrados_indices = df_editado[df_editado["❌ Borrar"] == True].index
+                
+                if len(borrados_indices) > 0:
+                    ts_elim = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
+                    quien_elimino = st.session_state.nombre_saludo
+                    
+                    for idx in borrados_indices:
+                        st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
+                        st.session_state.reservas.at[idx, "Eliminado_por"] = quien_elimino
+                        st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
+                        
+                    guardar_reservas_en_nube(st.session_state.reservas)
+                    st.success("✅ Reservas enviadas a la papelera / historial de eliminados.")
+                    time.sleep(2)
+                    st.rerun()
+                else:
+                    st.info("No marcaste ninguna reserva para borrar.")
+                    
+        st.markdown("---")
+        st.subheader("🗄️ Historial de Reservas Eliminadas (Auditoría)")
+        df_eliminadas = st.session_state.reservas[st.session_state.reservas["Estado"] == "Eliminado"]
+        if not df_eliminadas.empty:
+            cols_auditoria = ["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Eliminado_por", "Fecha_Eliminacion"]
+            st.dataframe(df_eliminadas[[c for c in cols_auditoria if c in df_eliminadas.columns]], use_container_width=True)
+        else:
+            st.write("No hay registros eliminados en la papelera.")
             
     with tab_horario:
         st.subheader(f"Generar Horario Coloreado para PDF ({str_semana})")
@@ -481,7 +523,7 @@ if st.session_state.rol_actual == "Admin":
         for h in horas:
             html_table += f"<tr><td class='hora'>{h}</td>"
             for d in dias:
-                reserva = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                reserva = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
                 if not reserva.empty:
                     contenido = ""
                     for _, r in reserva.iterrows():
@@ -530,7 +572,7 @@ if st.session_state.rol_actual == "Admin":
             matriz.fillna("🟢 Libre", inplace=True)
             for d in dias:
                 for h in horas:
-                    acts = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                    acts = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
                     if not acts.empty:
                         ocupados = []
                         for _, r in acts.iterrows():
@@ -559,7 +601,7 @@ if st.session_state.rol_actual == "Admin":
                     if h_sel:
                         for h in h_sel:
                             st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
-                            ocupados_en_bloque = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                            ocupados_en_bloque = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
                             amb_ya_ocupados, eq_ya_ocupados = set(), set()
                             for _, fila_o in ocupados_en_bloque.iterrows():
                                 for a in str(fila_o["Ambientes"]).split(","):
@@ -591,6 +633,9 @@ if st.session_state.rol_actual == "Admin":
                                 "Materiales": m_sel if m_sel else "(Ninguno)", 
                                 "Operario": "Sí" if req_operario else "No",
                                 "Fecha/Hora Registro": datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p"),
+                                "Estado": "Activa",
+                                "Eliminado_por": "",
+                                "Fecha_Eliminacion": "",
                                 "List_Amb": a_sel, "List_Eq": e_sel
                             })
                     st.markdown('</div>', unsafe_allow_html=True)
@@ -618,9 +663,13 @@ if st.session_state.rol_actual == "Admin":
                         with st.spinner("⏳ Guardando en la nube..."):
                             cruces = []
                             st.session_state.reservas = cargar_reservas()
+                            
+                            # Actualizar df_validas después de cargar de nuevo
+                            df_validas_refresh = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
+                            
                             for res in reservas_temporales:
                                 d, h = res["Día"], res["Horario"]
-                                for _, act in st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)].iterrows():
+                                for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
                                     amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
                                     eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
                                     if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
@@ -674,7 +723,7 @@ elif st.session_state.rol_actual == "Docente":
         matriz.fillna("🟢 Libre", inplace=True)
         for d in dias:
             for h in horas:
-                acts = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                acts = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
                 if not acts.empty:
                     ocupados = []
                     for _, r in acts.iterrows():
@@ -700,7 +749,7 @@ elif st.session_state.rol_actual == "Docente":
                 if h_sel:
                     for h in h_sel:
                         st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
-                        ocupados_en_bloque = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+                        ocupados_en_bloque = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
                         amb_ya_ocupados, eq_ya_ocupados = set(), set()
                         for _, fila_o in ocupados_en_bloque.iterrows():
                             for a in str(fila_o["Ambientes"]).split(","):
@@ -732,6 +781,9 @@ elif st.session_state.rol_actual == "Docente":
                             "Materiales": m_sel if m_sel else "(Ninguno)", 
                             "Operario": "Sí" if req_operario else "No",
                             "Fecha/Hora Registro": datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p"),
+                            "Estado": "Activa",
+                            "Eliminado_por": "",
+                            "Fecha_Eliminacion": "",
                             "List_Amb": a_sel, "List_Eq": e_sel
                         })
                 st.markdown('</div>', unsafe_allow_html=True)
@@ -759,9 +811,12 @@ elif st.session_state.rol_actual == "Docente":
                     with st.spinner("⏳ Guardando en la nube..."):
                         cruces = []
                         st.session_state.reservas = cargar_reservas()
+                        
+                        df_validas_refresh = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
+                        
                         for res in reservas_temporales:
                             d, h = res["Día"], res["Horario"]
-                            for _, act in st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)].iterrows():
+                            for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
                                 amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
                                 eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
                                 if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
@@ -801,7 +856,7 @@ else:
     
     for d in dias:
         for h in horas:
-            acts = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+            acts = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
             if not acts.empty:
                 ocupados = []
                 for _, r in acts.iterrows():
