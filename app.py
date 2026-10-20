@@ -215,7 +215,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab"] span { overflow: visible !important; white-space: nowrap !important; }
     .stTabs [aria-selected="true"] { background-color: #006b3f !important; color: white !important; border-bottom: 4px solid #69f0ae !important; }
 
-    /* CORRECCIÓN PARA CELULARES: OCULTAR ESPACIOS FANTASMAS DE LA BARRA LATERAL */
+    /* CORRECCIÓN PARA CELULARES */
     @media (max-width: 768px) {
         section[data-testid="stSidebar"] {
             width: 100% !important;
@@ -515,9 +515,11 @@ if st.session_state.rol_actual == "Admin":
             st.session_state.mostrar_exito = False
         
         if formulario_cerrado:
-            st.error("🔒 **SISTEMA CERRADO.** El plazo venció el jueves a las 10:00 p.m.")
+            st.error("🔒 **SISTEMA CERRADO.** El plazo para reservas venció el jueves a la medianoche. El sistema se reabrirá el viernes a las 8:00 am para la próxima semana.")
         else:
             st.info(f"✅ **SISTEMA ABIERTO.** Para la **{str_semana}**.")
+            st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
+            
             if st.button("🔄 Actualizar Disponibilidad (Admin)"):
                 with st.spinner("🔄 Actualizando..."):
                     st.session_state.reservas = cargar_reservas()
@@ -657,9 +659,11 @@ elif st.session_state.rol_actual == "Docente":
         st.session_state.mostrar_exito = False
     
     if formulario_cerrado:
-        st.error("🔒 **SISTEMA CERRADO.** El plazo venció el jueves a las 10:00 p.m.")
+        st.error("🔒 **SISTEMA CERRADO.** El plazo para reservas venció el jueves a la medianoche. El sistema se reabrirá el viernes a las 8:00 am para la próxima semana.")
     else:
         st.info(f"✅ **SISTEMA ABIERTO.** Para la **{str_semana}**.")
+        st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
+        
         if st.button("🔄 Actualizar Disponibilidad"):
             with st.spinner("🔄 Actualizando base de datos..."):
                 st.session_state.reservas = cargar_reservas()
@@ -781,9 +785,28 @@ elif st.session_state.rol_actual == "Docente":
                             else: st.error("Error guardando en Google Sheets.")
 
 # ==========================================
-# VISTA 3: PÚBLICA (SIN LOGUEARSE) - SOLO LOGIN LIMPIO
+# VISTA 3: PÚBLICA (SIN LOGUEARSE)
 # ==========================================
 else:
     st.title("🚜 SIMA - Intranet de Talleres UNALM")
     st.markdown("### Sistema Oficial de Separación de Maquinaria e Implementos")
+    st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
     st.info("👈 Por favor, ingrese sus credenciales en el menú lateral izquierdo para acceder a su perfil y separar recursos.")
+    
+    st.subheader("📊 Disponibilidad en Tiempo Real")
+    st.write(f"Estado general de los talleres para la **{str_semana}**")
+    
+    matriz = pd.DataFrame(index=horas, columns=dias)
+    matriz.fillna("🟢 Libre", inplace=True)
+    
+    for d in dias:
+        for h in horas:
+            acts = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
+            if not acts.empty:
+                ocupados = []
+                for _, r in acts.iterrows():
+                    if str(r["Ambientes"]) != "(Ninguno)": ocupados.append(str(r["Ambientes"]))
+                    if str(r["Equipos"]) != "(Ninguno)": ocupados.append(str(r["Equipos"]))
+                matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
+                
+    st.dataframe(matriz, use_container_width=True)
