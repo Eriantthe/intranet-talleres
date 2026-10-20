@@ -227,11 +227,11 @@ st.markdown("""
         }
     }
     
-    /* MARCA DE AGUA FLOTANTE (CREADO POR NORELLY) */
+   /* MARCA DE AGUA FLOTANTE (CREADO POR NORELLY) - POSICIÓN CORREGIDA */
     .marca-de-agua {
         position: fixed;
-        bottom: 15px;
-        right: 20px;
+        bottom: 30px; /* Más arriba para evitar la barra de Windows */
+        right: 180px; /* Más a la izquierda para evitar el menú de Streamlit */
         font-family: Arial, sans-serif;
         font-size: 13px;
         color: #7f8c8d;
