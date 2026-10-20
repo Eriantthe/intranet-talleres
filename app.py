@@ -131,26 +131,25 @@ profesores_lista = [
     "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO", "ADMINISTRACIÓN - NORELLY", "ALATA REY, JOSUÉ ELIEZER"
 ]
 
-# --- PALETA DE COLORES ÚNICOS Y DIFERENCIADOS PARA CADA PROFESOR ---
 def obtener_color_profesor(prof_nombre):
     prof_upper = str(prof_nombre).upper()
-    if "ROJAS" in prof_upper: return "#FFD1DC"          # Rosa pastel suave
-    if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#B5EAD7" # Verde menta claro
-    if "ALTAMIRANO" in prof_upper: return "#FFEAA7"     # Amarillo cálido
-    if "CACERES" in prof_upper or "CÁCERES" in prof_upper: return "#DFCCF1" # Lila claro
-    if "CHEVARRIA" in prof_upper or "CHEVARRÍA" in prof_upper: return "#FFD8B1" # Melocotón
-    if "REBAZA" in prof_upper: return "#C7CEEA"         # Azul periwinkle
-    if "ZINGG" in prof_upper: return "#E2F0CB"          # Verde pistacho suave
-    if "ORELLANA" in prof_upper: return "#A0C4FF"       # Azul cielo vivo
-    if "SALAS PEÑA" in prof_upper: return "#FDFFB6"     # Amarillo claro brillante
-    if "SALAS PINTO" in prof_upper: return "#FF9AA2"    # Coral suave
-    if "RUBIO" in prof_upper: return "#CAFFBF"          # Verde claro brillante
-    if "YARIN" in prof_upper or "YARÍN" in prof_upper: return "#FFC6FF" # Magenta claro
-    if "NORELLY" in prof_upper: return "#FFB703"        # Ámbar / Dorado
-    if "ALATA" in prof_upper: return "#9BF6FF"          # Turquesa claro
-    return "#E5E5E5"                                    # Gris neutro por defecto
+    if "ROJAS" in prof_upper: return "#FFD1DC"          
+    if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#B5EAD7" 
+    if "ALTAMIRANO" in prof_upper: return "#FFEAA7"     
+    if "CACERES" in prof_upper or "CÁCERES" in prof_upper: return "#DFCCF1" 
+    if "CHEVARRIA" in prof_upper or "CHEVARRÍA" in prof_upper: return "#FFD8B1" 
+    if "REBAZA" in prof_upper: return "#C7CEEA"         
+    if "ZINGG" in prof_upper: return "#E2F0CB"          
+    if "ORELLANA" in prof_upper: return "#A0C4FF"       
+    if "SALAS PEÑA" in prof_upper: return "#FDFFB6"     
+    if "SALAS PINTO" in prof_upper: return "#FF9AA2"    
+    if "RUBIO" in prof_upper: return "#CAFFBF"          
+    if "YARIN" in prof_upper or "YARÍN" in prof_upper: return "#FFC6FF" 
+    if "NORELLY" in prof_upper: return "#FFB703"        
+    if "ALATA" in prof_upper: return "#9BF6FF"          
+    return "#E5E5E5"                                    
 
-# --- ESTILO VISUAL ---
+# --- ESTILO VISUAL Y ADAPTACIÓN MÓVIL (RESPONSIVE) ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
@@ -215,6 +214,14 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab"] span { overflow: visible !important; white-space: nowrap !important; }
     .stTabs [aria-selected="true"] { background-color: #006b3f !important; color: white !important; border-bottom: 4px solid #69f0ae !important; }
+
+    /* CORRECCIÓN PARA CELULARES: OCULTAR ESPACIOS FANTASMAS DE LA BARRA LATERAL */
+    @media (max-width: 768px) {
+        section[data-testid="stSidebar"] {
+            width: 100% !important;
+            min-width: 100% !important;
+        }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -457,7 +464,6 @@ if st.session_state.rol_actual == "Admin":
     with tab_horario:
         st.subheader(f"Generar Horario Coloreado para PDF ({str_semana})")
         
-        # --- TABLA HTML MEJORADA CON TARJETAS INDEPENDIENTES POR PROFESOR ---
         html_table = f"""<html><head><meta charset="utf-8">
         <style>
             table {{ width: 100%; border-collapse: collapse; font-family: Arial; font-size: 12px; }}
@@ -480,7 +486,7 @@ if st.session_state.rol_actual == "Admin":
                     contenido = ""
                     for _, r in reserva.iterrows():
                         prof = r["Profesor"]
-                        bg_color = obtener_color_profesor(prof) # Color único por profesor
+                        bg_color = obtener_color_profesor(prof) 
                         fecha_reg = f"<small style='color:#555;'>({r.get('Fecha/Hora Registro', '')})</small><br>" if r.get('Fecha/Hora Registro', '') else ""
                         op_tag = " <b style='color:#b71c1c;'>[Requiere Operario]</b>" if r.get("Operario", "") == "Sí" else ""
                         
@@ -775,27 +781,9 @@ elif st.session_state.rol_actual == "Docente":
                             else: st.error("Error guardando en Google Sheets.")
 
 # ==========================================
-# VISTA 3: PÚBLICA (SIN LOGUEARSE)
+# VISTA 3: PÚBLICA (SIN LOGUEARSE) - SOLO LOGIN LIMPIO
 # ==========================================
 else:
     st.title("🚜 SIMA - Intranet de Talleres UNALM")
-    st.markdown("### Sistema Oficial de Separación de Maquinaria")
+    st.markdown("### Sistema Oficial de Separación de Maquinaria e Implementos")
     st.info("👈 Por favor, ingrese sus credenciales en el menú lateral izquierdo para acceder a su perfil y separar recursos.")
-    
-    st.subheader("📊 Disponibilidad en Tiempo Real")
-    st.write(f"Estado general de los talleres para la **{str_semana}**")
-    
-    matriz = pd.DataFrame(index=horas, columns=dias)
-    matriz.fillna("🟢 Libre", inplace=True)
-    
-    for d in dias:
-        for h in horas:
-            acts = st.session_state.reservas[(st.session_state.reservas["Día"] == d) & (st.session_state.reservas["Horario"] == h)]
-            if not acts.empty:
-                ocupados = []
-                for _, r in acts.iterrows():
-                    if str(r["Ambientes"]) != "(Ninguno)": ocupados.append(str(r["Ambientes"]))
-                    if str(r["Equipos"]) != "(Ninguno)": ocupados.append(str(r["Equipos"]))
-                matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
-                
-    st.dataframe(matriz, use_container_width=True)
