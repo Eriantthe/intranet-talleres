@@ -64,7 +64,6 @@ def cargar_reservas():
         data = r.json()
         if len(data) > 0:
             df = pd.DataFrame(data)
-            # Asegurar que existan las columnas de auditoría para "Baja Lógica"
             if "Estado" not in df.columns: df["Estado"] = "Activa"
             if "Eliminado_por" not in df.columns: df["Eliminado_por"] = ""
             if "Fecha_Eliminacion" not in df.columns: df["Fecha_Eliminacion"] = ""
@@ -230,7 +229,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# FILTRO GLOBAL DE RESERVAS ACTIVAS (Oculta las eliminadas en toda la interfaz pública)
 if not st.session_state.reservas.empty and "Estado" in st.session_state.reservas.columns:
     df_validas = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"]
 else:
@@ -248,7 +246,10 @@ if st.session_state.rol_actual:
         else:
             st.sidebar.markdown(f'<div class="caja-sesion">👑 Administrador<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
     elif st.session_state.rol_actual == "Docente":
-        st.sidebar.markdown(f'<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
+        if "MARGARITA" in st.session_state.nombre_saludo.upper():
+            st.sidebar.markdown(f'<div class="caja-sesion">👩‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ingeniera {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
+        else:
+            st.sidebar.markdown(f'<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
         
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     if st.sidebar.button("Cerrar Sesión"):
@@ -292,8 +293,10 @@ else:
 # ==========================================
 if st.session_state.rol_actual == "Admin":
     
-    if st.session_state.usuario_actual == "Norelly2026":
+    if "NORELLY" in st.session_state.nombre_saludo.upper():
         st.markdown(f'<div class="saludo-ios">Bienvenida Ing. {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
+    elif "MARGARITA" in st.session_state.nombre_saludo.upper():
+        st.markdown(f'<div class="saludo-ios">Bienvenida Ingeniera {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="saludo-ios">Bienvenido Ing. {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
         
@@ -460,7 +463,6 @@ if st.session_state.rol_actual == "Admin":
     with tab_reservas:
         st.subheader("Borrador de Reservas Activas")
         
-        # --- LÓGICA DE BAJA LÓGICA (SOFT DELETE) PARA PROTEGER EL EXCEL ---
         if "Estado" not in st.session_state.reservas.columns:
             st.session_state.reservas["Estado"] = "Activa"
             st.session_state.reservas["Eliminado_por"] = ""
@@ -664,7 +666,6 @@ if st.session_state.rol_actual == "Admin":
                             cruces = []
                             st.session_state.reservas = cargar_reservas()
                             
-                            # Actualizar df_validas después de cargar de nuevo
                             df_validas_refresh = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
                             
                             for res in reservas_temporales:
@@ -698,7 +699,10 @@ if st.session_state.rol_actual == "Admin":
 # ==========================================
 elif st.session_state.rol_actual == "Docente":
 
-    st.markdown(f'<div class="saludo-ios">Bienvenido Ing. {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
+    if "MARGARITA" in st.session_state.nombre_saludo.upper():
+        st.markdown(f'<div class="saludo-ios">Bienvenida Ingeniera {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div class="saludo-ios">Bienvenido Ing. {st.session_state.nombre_saludo}</div>', unsafe_allow_html=True)
     
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
@@ -845,23 +849,4 @@ elif st.session_state.rol_actual == "Docente":
 else:
     st.title("🚜 SIMA - Intranet de Talleres UNALM")
     st.markdown("### Sistema Oficial de Separación de Maquinaria e Implementos")
-    st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
     st.info("👈 Por favor, ingrese sus credenciales en el menú lateral izquierdo para acceder a su perfil y separar recursos.")
-    
-    st.subheader("📊 Disponibilidad en Tiempo Real")
-    st.write(f"Estado general de los talleres para la **{str_semana}**")
-    
-    matriz = pd.DataFrame(index=horas, columns=dias)
-    matriz.fillna("🟢 Libre", inplace=True)
-    
-    for d in dias:
-        for h in horas:
-            acts = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
-            if not acts.empty:
-                ocupados = []
-                for _, r in acts.iterrows():
-                    if str(r["Ambientes"]) != "(Ninguno)": ocupados.append(str(r["Ambientes"]))
-                    if str(r["Equipos"]) != "(Ninguno)": ocupados.append(str(r["Equipos"]))
-                matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
-                
-    st.dataframe(matriz, use_container_width=True)
