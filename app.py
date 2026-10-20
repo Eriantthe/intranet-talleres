@@ -154,7 +154,7 @@ def obtener_color_profesor(prof_nombre):
     if "ALATA" in prof_upper: return "#9BF6FF"          
     return "#E5E5E5"                                    
 
-# --- ESTILO VISUAL Y ADAPTACIÓN MÓVIL ---
+# --- ESTILO VISUAL, ADAPTACIÓN MÓVIL Y MARCA DE AGUA ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
@@ -226,7 +226,26 @@ st.markdown("""
             min-width: 100% !important;
         }
     }
+    
+    /* MARCA DE AGUA FLOTANTE (CREADO POR NORELLY) */
+    .marca-de-agua {
+        position: fixed;
+        bottom: 15px;
+        right: 20px;
+        font-family: Arial, sans-serif;
+        font-size: 13px;
+        color: #7f8c8d;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 5px 10px;
+        border-radius: 8px;
+        box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+        z-index: 9999;
+        pointer-events: none;
+    }
     </style>
+    
+    <!-- INYECCIÓN HTML DE LA MARCA DE AGUA -->
+    <div class="marca-de-agua">Desarrollado por <b>Norelly Cárdenas</b></div>
 """, unsafe_allow_html=True)
 
 if not st.session_state.reservas.empty and "Estado" in st.session_state.reservas.columns:
@@ -695,7 +714,7 @@ if st.session_state.rol_actual == "Admin":
 
 
 # ==========================================
-# VISTA 2: DOCENTE NORMAL (VISTA DIRECTA DE RESERVAS)
+# VISTA 2: DOCENTE NORMAL (CON PESTAÑA PARA BORRAR SUS RESERVAS)
 # ==========================================
 elif st.session_state.rol_actual == "Docente":
 
@@ -706,125 +725,129 @@ elif st.session_state.rol_actual == "Docente":
     
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
-    if st.session_state.mostrar_exito:
-        st.balloons()
-        st.success("✅ ¡Guardado satisfactoriamente! El formulario se ha reiniciado.")
-        st.session_state.mostrar_exito = False
+    # --- PESTAÑAS PARA EL DOCENTE ---
+    tab_reservar, tab_mis_reservas = st.tabs(["📝 Hacer Reserva", "🗑️ Mis Reservas"])
     
-    if formulario_cerrado:
-        st.error("🔒 **SISTEMA CERRADO.** El plazo para reservas venció el jueves a la medianoche. El sistema se reabrirá el viernes a las 8:00 am para la próxima semana.")
-    else:
-        st.info(f"✅ **SISTEMA ABIERTO.** Para la **{str_semana}**.")
-        st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
+    with tab_reservar:
+        if st.session_state.mostrar_exito:
+            st.balloons()
+            st.success("✅ ¡Guardado satisfactoriamente! El formulario se ha reiniciado.")
+            st.session_state.mostrar_exito = False
         
-        if st.button("🔄 Actualizar Disponibilidad"):
-            with st.spinner("🔄 Actualizando base de datos..."):
-                st.session_state.reservas = cargar_reservas()
-            st.rerun()
+        if formulario_cerrado:
+            st.error("🔒 **SISTEMA CERRADO.** El plazo para reservas venció el jueves a la medianoche. El sistema se reabrirá el viernes a las 8:00 am para la próxima semana.")
+        else:
+            st.info(f"✅ **SISTEMA ABIERTO.** Para la **{str_semana}**.")
+            st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
             
-        st.subheader("📊 Recursos Ocupados en Tiempo Real")
-        matriz = pd.DataFrame(index=horas, columns=dias)
-        matriz.fillna("🟢 Libre", inplace=True)
-        for d in dias:
-            for h in horas:
-                acts = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
-                if not acts.empty:
-                    ocupados = []
-                    for _, r in acts.iterrows():
-                        if str(r["Ambientes"]) != "(Ninguno)": ocupados.append(str(r["Ambientes"]))
-                        if str(r["Equipos"]) != "(Ninguno)": ocupados.append(str(r["Equipos"]))
-                    matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
-        st.dataframe(matriz, use_container_width=True)
-        st.markdown("---")
-        
-        st.subheader("📝 Formulario de Registro de Separación")
-        
-        st.text_input("Docente Responsable (Autocompletado)", value=st.session_state.nombre_oficial, disabled=True)
-        profesor = st.session_state.nombre_oficial
-        
-        dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias, key=f"dias_main_{st.session_state.form_key}")
-        reservas_temporales = []
-        
-        if dias_sel:
-            st.markdown("##### 2. Requerimientos por Bloque Horario")
-            for d in dias_sel:
-                st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()}</div>', unsafe_allow_html=True)
-                h_sel = st.multiselect(f"⏰ Horarios para el {d}:", horas, key=f"h_{d}_{st.session_state.form_key}")
-                if h_sel:
-                    for h in h_sel:
-                        st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
-                        ocupados_en_bloque = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
-                        amb_ya_ocupados, eq_ya_ocupados = set(), set()
-                        for _, fila_o in ocupados_en_bloque.iterrows():
-                            for a in str(fila_o["Ambientes"]).split(","):
-                                if a.strip() and a.strip() not in ["(Ninguno)", "Campo"]: amb_ya_ocupados.add(a.strip())
-                            for e in str(fila_o["Equipos"]).split(","):
-                                if e.strip() and e.strip() not in ["(Ninguno)", "Ningún Equipo en particular"]: eq_ya_ocupados.add(e.strip())
+            if st.button("🔄 Actualizar Disponibilidad"):
+                with st.spinner("🔄 Actualizando base de datos..."):
+                    st.session_state.reservas = cargar_reservas()
+                st.rerun()
+                
+            st.subheader("📊 Recursos Ocupados en Tiempo Real")
+            matriz = pd.DataFrame(index=horas, columns=dias)
+            matriz.fillna("🟢 Libre", inplace=True)
+            for d in dias:
+                for h in horas:
+                    acts = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
+                    if not acts.empty:
+                        ocupados = []
+                        for _, r in acts.iterrows():
+                            if str(r["Ambientes"]) != "(Ninguno)": ocupados.append(str(r["Ambientes"]))
+                            if str(r["Equipos"]) != "(Ninguno)": ocupados.append(str(r["Equipos"]))
+                        matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
+            st.dataframe(matriz, use_container_width=True)
+            st.markdown("---")
+            
+            st.subheader("📝 Formulario de Registro de Separación")
+            
+            st.text_input("Docente Responsable (Autocompletado)", value=st.session_state.nombre_oficial, disabled=True)
+            profesor = st.session_state.nombre_oficial
+            
+            dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias, key=f"dias_main_{st.session_state.form_key}")
+            reservas_temporales = []
+            
+            if dias_sel:
+                st.markdown("##### 2. Requerimientos por Bloque Horario")
+                for d in dias_sel:
+                    st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()}</div>', unsafe_allow_html=True)
+                    h_sel = st.multiselect(f"⏰ Horarios para el {d}:", horas, key=f"h_{d}_{st.session_state.form_key}")
+                    if h_sel:
+                        for h in h_sel:
+                            st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
+                            ocupados_en_bloque = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
+                            amb_ya_ocupados, eq_ya_ocupados = set(), set()
+                            for _, fila_o in ocupados_en_bloque.iterrows():
+                                for a in str(fila_o["Ambientes"]).split(","):
+                                    if a.strip() and a.strip() not in ["(Ninguno)", "Campo"]: amb_ya_ocupados.add(a.strip())
+                                for e in str(fila_o["Equipos"]).split(","):
+                                    if e.strip() and e.strip() not in ["(Ninguno)", "Ningún Equipo en particular"]: eq_ya_ocupados.add(e.strip())
 
-                        def formatear_amb(n): return f"🔴 [OCUPADO] {n}" if n in amb_ya_ocupados else n
-                        def formatear_eq(n): return f"🔴 [OCUPADO] {n}" if n in eq_ya_ocupados else n
+                            def formatear_amb(n): return f"🔴 [OCUPADO] {n}" if n in amb_ya_ocupados else n
+                            def formatear_eq(n): return f"🔴 [OCUPADO] {n}" if n in eq_ya_ocupados else n
 
-                        col_a, col_e = st.columns(2)
-                        with col_a: a_sel = st.multiselect("🏢 Ambientes", ambientes_base, format_func=formatear_amb, key=f"a_{d}_{h}_{st.session_state.form_key}")
-                        with col_e: e_sel = st.multiselect("🚜 Equipos", equipos_base, format_func=formatear_eq, key=f"e_{d}_{h}_{st.session_state.form_key}")
-                        
-                        if [a for a in a_sel if a in amb_ya_ocupados] or [e for e in e_sel if e in eq_ya_ocupados]:
-                            st.warning("⚠️ **Atención:** Algún recurso seleccionado ya está ocupado.")
+                            col_a, col_e = st.columns(2)
+                            with col_a: a_sel = st.multiselect("🏢 Ambientes", ambientes_base, format_func=formatear_amb, key=f"a_{d}_{h}_{st.session_state.form_key}")
+                            with col_e: e_sel = st.multiselect("🚜 Equipos", equipos_base, format_func=formatear_eq, key=f"e_{d}_{h}_{st.session_state.form_key}")
                             
-                        col_mat, col_op = st.columns([3, 1])
-                        with col_mat: m_sel = st.text_input("🛠️ Materiales extra", key=f"m_{d}_{h}_{st.session_state.form_key}")
-                        with col_op:
-                            st.write(""); st.write("")
-                            req_operario = st.checkbox("👷 Requiere Operario", key=f"op_{d}_{h}_{st.session_state.form_key}")
-                        st.markdown('</div>', unsafe_allow_html=True)
-                        
-                        reservas_temporales.append({
-                            "Día": d, "Horario": h, "Profesor": profesor, 
-                            "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
-                            "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)", 
-                            "Materiales": m_sel if m_sel else "(Ninguno)", 
-                            "Operario": "Sí" if req_operario else "No",
-                            "Fecha/Hora Registro": datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p"),
-                            "Estado": "Activa",
-                            "Eliminado_por": "",
-                            "Fecha_Eliminacion": "",
-                            "List_Amb": a_sel, "List_Eq": e_sel
-                        })
-                st.markdown('</div>', unsafe_allow_html=True)
-            
-            if reservas_temporales:
-                st.markdown("---")
-                st.markdown("### 👁️ Previsualización de su Horario")
-                st.info("Verifique su horario. Lo reservado por otros aparece en ROJO. Su separación actual resalta en AZUL.")
+                            if [a for a in a_sel if a in amb_ya_ocupados] or [e for e in e_sel if e in eq_ya_ocupados]:
+                                st.warning("⚠️ **Atención:** Algún recurso seleccionado ya está ocupado.")
+                                
+                            col_mat, col_op = st.columns([3, 1])
+                            with col_mat: m_sel = st.text_input("🛠️ Materiales extra", key=f"m_{d}_{h}_{st.session_state.form_key}")
+                            with col_op:
+                                st.write(""); st.write("")
+                                req_operario = st.checkbox("👷 Requiere Operario", key=f"op_{d}_{h}_{st.session_state.form_key}")
+                            st.markdown('</div>', unsafe_allow_html=True)
+                            
+                            reservas_temporales.append({
+                                "Día": d, "Horario": h, "Profesor": profesor, 
+                                "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
+                                "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)", 
+                                "Materiales": m_sel if m_sel else "(Ninguno)", 
+                                "Operario": "Sí" if req_operario else "No",
+                                "Fecha/Hora Registro": datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p"),
+                                "Estado": "Activa",
+                                "Eliminado_por": "",
+                                "Fecha_Eliminacion": "",
+                                "List_Amb": a_sel, "List_Eq": e_sel
+                            })
+                    st.markdown('</div>', unsafe_allow_html=True)
                 
-                df_horario_visual = matriz.copy()
-                for res in reservas_temporales:
-                    tag_op = " [Operario: SÍ]" if res["Operario"] == "Sí" else ""
-                    texto_celda_azul = f"🔵 SU SELECCIÓN:\nAmb: {res['Ambientes']}\nEq: {res['Equipos']}{tag_op}"
-                    actual = df_horario_visual.at[res["Horario"], res["Día"]]
+                if reservas_temporales:
+                    st.markdown("---")
+                    st.markdown("### 👁️ Previsualización de su Horario")
+                    st.info("Verifique su horario. Lo reservado por otros aparece en ROJO. Su separación actual resalta en AZUL.")
                     
-                    if "🟢" in str(actual): 
-                        df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda_azul
-                    else: 
-                        df_horario_visual.at[res["Horario"], res["Día"]] = str(actual) + "\n\n" + texto_celda_azul
+                    df_horario_visual = matriz.copy()
+                    for res in reservas_temporales:
+                        tag_op = " [Operario: SÍ]" if res["Operario"] == "Sí" else ""
+                        texto_celda_azul = f"🔵 SU SELECCIÓN:\nAmb: {res['Ambientes']}\nEq: {res['Equipos']}{tag_op}"
+                        actual = df_horario_visual.at[res["Horario"], res["Día"]]
                         
-                st.table(df_horario_visual)
-                
-                placeholder_exito = st.empty()
-                if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
-                    with st.spinner("⏳ Guardando en la nube..."):
-                        cruces = []
-                        st.session_state.reservas = cargar_reservas()
-                        
-                        df_validas_refresh = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
-                        
-                        for res in reservas_temporales:
-                            d, h = res["Día"], res["Horario"]
-                            for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
-                                amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
-                                eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
-                                if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
-                                    cruces.append(f"{d} a las {h}")
+                        if "🟢" in str(actual): 
+                            df_horario_visual.at[res["Horario"], res["Día"]] = texto_celda_azul
+                        else: 
+                            df_horario_visual.at[res["Horario"], res["Día"]] = str(actual) + "\n\n" + texto_celda_azul
+                            
+                    st.table(df_horario_visual)
+                    
+                    placeholder_exito = st.empty()
+                    if st.button("✅ Confirmar Separación Definitiva", use_container_width=True):
+                        with st.spinner("⏳ Guardando en la nube..."):
+                            cruces = []
+                            st.session_state.reservas = cargar_reservas()
+                            
+                            df_validas_refresh = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
+                            
+                            for res in reservas_temporales:
+                                d, h = res["Día"], res["Horario"]
+                                for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
+                                    amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
+                                    eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
+                                    if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
+                                        cruces.append(f"{d} a las {h}")
                         
                         if cruces: st.error("⚠️ **Cruce detectado:** Otros docentes acaban de separar estos recursos.")
                         else:
@@ -842,6 +865,45 @@ elif st.session_state.rol_actual == "Docente":
                                 st.session_state.mostrar_exito = True
                                 st.rerun()
                             else: st.error("Error guardando en Google Sheets.")
+
+    with tab_mis_reservas:
+        st.subheader("🗑️ Anular Mis Reservas Activas")
+        st.write("Si cometió un error o desea cancelar una clase, seleccione la reserva y proceda a anularla. Esta acción liberará el espacio para otros docentes.")
+        
+        mis_reservas = df_validas[df_validas["Profesor"] == st.session_state.nombre_oficial].copy()
+        
+        if not mis_reservas.empty:
+            columnas_orden_mis = ["Fecha/Hora Registro", "Día", "Horario", "Ambientes", "Equipos", "Materiales", "Operario"]
+            df_mostrar_mis = mis_reservas[[c for c in columnas_orden_mis if c in mis_reservas.columns]].copy()
+            df_mostrar_mis.insert(0, "❌ Anular", False)
+            
+            df_editado_mis = st.data_editor(df_mostrar_mis, use_container_width=True)
+            
+            if st.button("🗑️ Procesar Anulación de Seleccionadas"):
+                with st.spinner('⏳ Liberando espacios en la nube...'):
+                    borrados_indices_mis = df_editado_mis[df_editado_mis["❌ Anular"] == True].index
+                    
+                    if len(borrados_indices_mis) > 0:
+                        ts_elim = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
+                        
+                        if "Estado" not in st.session_state.reservas.columns:
+                            st.session_state.reservas["Estado"] = "Activa"
+                            st.session_state.reservas["Eliminado_por"] = ""
+                            st.session_state.reservas["Fecha_Eliminacion"] = ""
+                            
+                        for idx in borrados_indices_mis:
+                            st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
+                            st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
+                            st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
+                            
+                        guardar_reservas_en_nube(st.session_state.reservas)
+                        st.success("✅ Reservas anuladas correctamente. El espacio ya está libre.")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.info("No marcaste ninguna reserva para anular.")
+        else:
+            st.info("No tiene reservas activas programadas en este momento.")
 
 # ==========================================
 # VISTA 3: PÚBLICA (SIN LOGUEARSE)
