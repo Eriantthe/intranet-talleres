@@ -6,6 +6,7 @@ import pytz
 import time
 import requests
 import json
+import uuid
 
 # === GENERADOR DE PDF NATIVO ===
 try:
@@ -30,7 +31,6 @@ st.set_page_config(page_title="SIMA - Intranet Talleres UNALM", layout="wide", i
 def cargar_docentes():
     try:
         df = pd.read_csv(URL_CSV_USUARIOS, header=None)
-        
         fila_head = 0
         for idx, row in df.iterrows():
             valores = [str(x).lower().strip() for x in row.values]
@@ -79,12 +79,14 @@ def cargar_reservas():
             if "Eliminado_por" not in df.columns: df["Eliminado_por"] = ""
             if "Fecha_Eliminacion" not in df.columns: df["Fecha_Eliminacion"] = ""
             if "Materiales" not in df.columns: df["Materiales"] = "(Ninguno)"
+            if "Semana" not in df.columns: df["Semana"] = "Semana Antigua"
+            if "ID_Reserva" not in df.columns: df["ID_Reserva"] = [str(uuid.uuid4()) for _ in range(len(df))]
             return df
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
         
     return pd.DataFrame(columns=[
-        "Día", "Horario", "Profesor", "Ambientes", 
+        "ID_Reserva", "Semana", "Día", "Horario", "Profesor", "Ambientes", 
         "Equipos", "Materiales", "Operario", "Fecha/Hora Registro",
         "Estado", "Eliminado_por", "Fecha_Eliminacion"
     ])
@@ -92,16 +94,8 @@ def cargar_reservas():
 def guardar_reservas_en_nube(df):
     try:
         registros = df.to_dict(orient='records')
-        payload = {
-            "action": "save", 
-            "reservas": registros
-        }
-        requests.post(
-            URL_APPS_SCRIPT, 
-            data=json.dumps(payload), 
-            headers={'Content-Type': 'application/json'}, 
-            timeout=10
-        )
+        payload = {"action": "save", "reservas": registros}
+        requests.post(URL_APPS_SCRIPT, data=json.dumps(payload), headers={'Content-Type': 'application/json'}, timeout=10)
         return True
     except:
         return False
@@ -117,27 +111,26 @@ if "reservas" not in st.session_state or st.session_state.reservas.empty:
     st.session_state.reservas = cargar_reservas()
 
 # ==========================================
-# LÓGICA DE TIEMPO Y CAMBIO DE SEMANA EXACTO
+# LÓGICA DE TIEMPO: SALTO AUTOMÁTICO DE SEMANA
 # ==========================================
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
-wd = ahora.weekday()
+wd = ahora.weekday() # 0=Lunes, 3=Jueves, 4=Viernes
 
-# El sistema cierra a las 23:59 del Jueves, por lo que el Viernes de 00:00 a 07:59 está cerrado.
-# A partir de las 8:00am del Viernes, empieza la reserva de la NUEVA semana (salto de 1 semana más)
-if wd == 4 and ahora.hour >= 8: # Viernes (después de 8am)
+if wd == 4 and ahora.hour >= 8: # Viernes después de las 8:00 am -> Salta a la próxima semana
     dias_al_lunes = 10
 elif wd == 5: # Sábado
     dias_al_lunes = 9
 elif wd == 6: # Domingo
     dias_al_lunes = 8
-else: # Lunes a Jueves (y Viernes madrugada)
+else: # Lunes a Jueves (y Viernes madrugada) -> Semana inminente
     dias_al_lunes = 7 - wd
 
 lunes_obj = ahora + timedelta(days=dias_al_lunes)
 viernes_obj = lunes_obj + timedelta(days=4)
 str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime('%d/%m')}"
 
+# Cierra el jueves a la medianoche (que técnicamente es viernes de 00:00 a 07:59 am)
 formulario_cerrado = (wd == 4 and ahora.hour < 8)
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
@@ -175,80 +168,37 @@ def obtener_color_profesor(prof_nombre):
     if "ALATA" in prof_upper: return "#9BF6FF"          
     return "#E5E5E5"                                    
 
-# --- ESTILO VISUAL, ADAPTACIÓN MÓVIL Y MARCA DE AGUA ---
+# --- ESTILO VISUAL Y MARCA DE AGUA CORREGIDA ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
     
-    section[data-testid="stSidebar"] { 
-        width: 380px !important;
-        min-width: 380px !important;
-        background-color: #006b3f !important; 
-    }
+    section[data-testid="stSidebar"] { width: 380px !important; min-width: 380px !important; background-color: #006b3f !important; }
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
     [data-testid="stSidebar"] label p { color: white !important; }
     input { color: black !important; background-color: white !important; }
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
     div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
     
-    .caja-sesion {
-        background-color: #e8f5e9;
-        color: #006b3f;
-        padding: 15px;
-        border-radius: 10px;
-        font-weight: bold;
-        text-align: center;
-        margin-bottom: 20px;
-        border: 2px solid #69f0ae;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-    }
-    
-    .saludo-ios {
-        font-family: 'Grand Hotel', cursive;
-        font-size: 55px; 
-        font-weight: 400;
-        background: linear-gradient(90deg, #002b12 0%, #008f4c 50%, #69f0ae 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        margin-top: -20px; 
-        margin-bottom: 35px; 
-        line-height: 1.3;
-        padding: 5px 25px 5px 5px; 
-        display: inline-block;
-    }
-    
+    .caja-sesion { background-color: #e8f5e9; color: #006b3f; padding: 15px; border-radius: 10px; font-weight: bold; text-align: center; margin-bottom: 20px; border: 2px solid #69f0ae; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .saludo-ios { font-family: 'Grand Hotel', cursive; font-size: 55px; font-weight: 400; background: linear-gradient(90deg, #002b12 0%, #008f4c 50%, #69f0ae 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-top: -20px; margin-bottom: 35px; line-height: 1.3; padding: 5px 25px 5px 5px; display: inline-block; }
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
     .titulo-dia { font-size: 18px; font-weight: bold; color: #006b3f; margin-bottom: 10px;}
     .bloque-hora { background-color: #ffffff; padding: 12px; border-radius: 5px; margin-top: 15px; margin-bottom: 5px; border-left: 4px solid #4CAF50; border: 1px solid #dcdcdc;}
     .titulo-hora { font-size: 15px; font-weight: bold; color: #333333; margin-bottom: 8px;}
-    
     .tarjeta-fluido { background-color: white; padding: 15px; border-radius: 15px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); text-align: center; border-bottom: 5px solid #006b3f; margin-bottom: 10px;}
     .icono-fluido { font-size: 40px; margin-bottom: 5px; }
     .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
     .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
     
     .stTabs [data-baseweb="tab-list"] { gap: 15px; overflow-x: visible !important; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #f0f2f6;
-        border-radius: 8px 8px 0px 0px;
-        padding: 12px 25px !important;
-        font-weight: bold !important;
-        font-size: 17px !important;
-        min-width: fit-content !important; 
-        white-space: nowrap !important; 
-        overflow: visible !important; 
-    }
+    .stTabs [data-baseweb="tab"] { background-color: #f0f2f6; border-radius: 8px 8px 0px 0px; padding: 12px 25px !important; font-weight: bold !important; font-size: 17px !important; min-width: fit-content !important; white-space: nowrap !important; overflow: visible !important; }
     .stTabs [data-baseweb="tab"] span { overflow: visible !important; white-space: nowrap !important; }
     .stTabs [aria-selected="true"] { background-color: #006b3f !important; color: white !important; border-bottom: 4px solid #69f0ae !important; }
 
-    @media (max-width: 768px) {
-        section[data-testid="stSidebar"] {
-            width: 100% !important;
-            min-width: 100% !important;
-        }
-    }
+    @media (max-width: 768px) { section[data-testid="stSidebar"] { width: 100% !important; min-width: 100% !important; } }
     
-    /* MARCA DE AGUA FLOTANTE */
+    /* MARCA DE AGUA CORREGIDA (Más a la izquierda y arriba) */
     .marca-de-agua {
         position: fixed;
         bottom: 30px; 
@@ -268,8 +218,12 @@ st.markdown("""
     <div class="marca-de-agua">Desarrollado por <b>Norelly Cárdenas</b></div>
 """, unsafe_allow_html=True)
 
+# FILTRO GLOBAL: Mostrar solo reservas ACTIVAS y de la SEMANA ACTUAL en curso
 if not st.session_state.reservas.empty and "Estado" in st.session_state.reservas.columns:
-    df_validas = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"]
+    df_validas = st.session_state.reservas[
+        (st.session_state.reservas["Estado"] != "Eliminado") & 
+        (st.session_state.reservas["Semana"] == str_semana)
+    ]
 else:
     df_validas = st.session_state.reservas
 
@@ -301,25 +255,20 @@ else:
     st.sidebar.markdown("### 🔐 Acceso al Sistema")
     usuario_input = st.sidebar.text_input("Usuario")
     clave_input = st.sidebar.text_input("Contraseña", type="password")
-    
     if st.sidebar.button("Entrar"):
         docentes_dict = cargar_docentes()
-        
         if usuario_input == "Norelly2026" and clave_input == "Pool2026":
             st.session_state.rol_actual = "Admin"
             st.session_state.usuario_actual = "Norelly2026"
             st.session_state.nombre_saludo = "Norelly"
             st.session_state.nombre_oficial = "ADMINISTRACIÓN - NORELLY"
             st.rerun()
-            
         elif usuario_input == clave_input and usuario_input in docentes_dict:
             datos_doc = docentes_dict[usuario_input]
-            
             if usuario_input == "41264537": 
                 st.session_state.rol_actual = "Admin"
             else:
                 st.session_state.rol_actual = "Docente"
-                
             st.session_state.usuario_actual = usuario_input
             st.session_state.nombre_saludo = datos_doc["saludo"]
             st.session_state.nombre_oficial = datos_doc["oficial"]
@@ -410,8 +359,7 @@ if st.session_state.rol_actual == "Admin":
             
             def obtener_valor_actual(parametro):
                 fila = df_trac[df_trac["Registro"].str.contains(parametro, na=False)]
-                if not fila.empty and ultima_col_fecha:
-                    return str(fila[ultima_col_fecha].values[0])
+                if not fila.empty and ultima_col_fecha: return str(fila[ultima_col_fecha].values[0])
                 return "Sin dato"
 
             comb_txt = obtener_valor_actual("combustible")
@@ -421,11 +369,7 @@ if st.session_state.rol_actual == "Admin":
             horo_txt = obtener_valor_actual("horometro")
             if horo_txt == "Sin dato": horo_txt = obtener_valor_actual("horómetro")
 
-            val_comb = mapear_nivel(comb_txt)
-            val_refri = mapear_nivel(refri_txt)
-            val_aceite_m = mapear_nivel(aceite_m_txt)
-            val_aceite_h = mapear_nivel(aceite_h_txt)
-            
+            val_comb, val_refri, val_aceite_m, val_aceite_h = mapear_nivel(comb_txt), mapear_nivel(refri_txt), mapear_nivel(aceite_m_txt), mapear_nivel(aceite_h_txt)
             fecha_etiqueta = f" ({ultima_col_fecha})" if ultima_col_fecha else ""
             st.markdown(f"### 📌 Nivel Más Reciente: **{tractor_sel}**{fecha_etiqueta}")
             
@@ -467,10 +411,6 @@ if st.session_state.rol_actual == "Admin":
                     fig.update_traces(line_color="#006b3f", marker=dict(size=8, color="#ff5722"))
                     fig.update_layout(yaxis=dict(range=[0, 105], title="Nivel Estimado (%)"))
                 st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning(f"No se registraron datos para {metrica_grafico} en este equipo.")
-        else:
-            st.error("No se encontraron nombres de tractores.")
 
     with tab_evidencias:
         st.subheader("📸 Buscador Automático de Evidencias en Google Drive")
@@ -485,7 +425,7 @@ if st.session_state.rol_actual == "Admin":
             clave_param_ev = {"Combustible": "combustible", "Refrigerante": "refrigerante", "Aceite de Motor": "aceite de motor", "Aceite Hidráulico": "hidráulico", "Horómetro": "horometro"}[fluido_ev]
             df_trac_ev = df_datos[df_datos["Tractor"] == tractor_ev]
             fila_metrica_ev = df_trac_ev[df_trac_ev["Registro"].str.contains(clave_param_ev, na=False)]
-            valor_registrado = str(fila_metrica_ev[fecha_ev].values[0]) if not fila_metrica_ev.empty and fecha_ev in fila_metrica_ev.columns else "No registrado en Excel"
+            valor_registrado = str(fila_metrica_ev[fecha_ev].values[0]) if not fila_metrica_ev.empty and fecha_ev in fila_metrica_ev.columns else "No registrado"
             
             st.markdown(f"**Nivel reportado en Excel:** `{valor_registrado}`")
             st.markdown("---")
@@ -500,41 +440,44 @@ if st.session_state.rol_actual == "Admin":
                         st.error(f"Error de conexión: {e}")
 
     with tab_reservas:
-        st.subheader("Borrador de Reservas Activas")
+        st.subheader("Borrador de Reservas Activas (Semana Actual)")
         
-        df_activas = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"].copy()
-        
-        columnas_orden = ["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
-        df_mostrar = df_activas[[c for c in columnas_orden if c in df_activas.columns]].copy()
+        columnas_orden = ["ID_Reserva", "Fecha/Hora Registro", "Semana", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
+        df_mostrar = df_validas[[c for c in columnas_orden if c in df_validas.columns]].copy()
         df_mostrar.insert(0, "❌ Borrar", False)
         
-        df_editado = st.data_editor(df_mostrar, use_container_width=True)
+        df_editado = st.data_editor(
+            df_mostrar, 
+            use_container_width=True, 
+            hide_index=True, 
+            column_config={"ID_Reserva": None} # Oculta el ID de la vista
+        )
         
         if st.button("🗑️ Procesar Eliminaciones en la Nube"):
             with st.spinner('⏳ Archivando registros en la nube...'):
-                borrados_indices = df_editado[df_editado["❌ Borrar"] == True].index
+                ids_a_borrar = df_editado[df_editado["❌ Borrar"] == True]["ID_Reserva"].tolist()
                 
-                if len(borrados_indices) > 0:
+                if len(ids_a_borrar) > 0:
                     ts_elim = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
-                    quien_elimino = st.session_state.nombre_saludo
-                    
-                    for idx in borrados_indices:
+                    for id_res in ids_a_borrar:
+                        # Busca el ID exacto en la base original
+                        idx = st.session_state.reservas[st.session_state.reservas["ID_Reserva"] == id_res].index[0]
                         st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
-                        st.session_state.reservas.at[idx, "Eliminado_por"] = quien_elimino
+                        st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
                         st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
                         
                     guardar_reservas_en_nube(st.session_state.reservas)
-                    st.success("✅ Reservas enviadas a la papelera / historial de eliminados.")
+                    st.success("✅ Reservas enviadas a la papelera / historial.")
                     time.sleep(2)
                     st.rerun()
                 else:
                     st.info("No marcaste ninguna reserva para borrar.")
                     
         st.markdown("---")
-        st.subheader("🗄️ Historial de Reservas Eliminadas (Auditoría)")
+        st.subheader("🗄️ Historial de Reservas Eliminadas (Auditoría Global)")
         df_eliminadas = st.session_state.reservas[st.session_state.reservas["Estado"] == "Eliminado"]
         if not df_eliminadas.empty:
-            cols_auditoria = ["Día", "Horario", "Profesor", "Ambientes", "Equipos", "Eliminado_por", "Fecha_Eliminacion"]
+            cols_auditoria = ["Semana", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Eliminado_por", "Fecha_Eliminacion"]
             st.dataframe(df_eliminadas[[c for c in cols_auditoria if c in df_eliminadas.columns]], use_container_width=True)
         else:
             st.write("No hay registros eliminados en la papelera.")
@@ -552,7 +495,6 @@ if st.session_state.rol_actual == "Admin":
                 elements.append(Paragraph("<br/>", styles['Normal']))
                 
                 data = [["Hora", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]]
-                
                 for h in horas:
                     row = [h]
                     for d in dias:
@@ -594,10 +536,9 @@ if st.session_state.rol_actual == "Admin":
                 type="primary"
             )
         else:
-            st.warning("⚠️ Para descargar en formato PDF nativo, por favor agrega **reportlab** a tu archivo de *requirements.txt*.")
+            st.warning("⚠️ Recuerda añadir **reportlab** a tu archivo de *requirements.txt* para habilitar el PDF.")
 
         st.markdown("<br>", unsafe_allow_html=True)
-        # Vista HTML original con materiales agregados
         html_table = f"""<html><head><meta charset="utf-8">
         <style>
             table {{ width: 100%; border-collapse: collapse; font-family: Arial; font-size: 12px; }}
@@ -607,7 +548,6 @@ if st.session_state.rol_actual == "Admin":
             .tarjeta-reserva {{ padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(0,0,0,0.15); }}
         </style></head><body>
         <table><tr><th>Hora</th>"""
-        
         for d in dias: html_table += f"<th>{d}</th>"
         html_table += "</tr>"
         
@@ -718,6 +658,8 @@ if st.session_state.rol_actual == "Admin":
                             st.markdown('</div>', unsafe_allow_html=True)
                             
                             reservas_temporales.append({
+                                "ID_Reserva": str(uuid.uuid4()),
+                                "Semana": str_semana,
                                 "Día": d, "Horario": h, "Profesor": profesor, 
                                 "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                                 "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)", 
@@ -755,7 +697,10 @@ if st.session_state.rol_actual == "Admin":
                             cruces = []
                             st.session_state.reservas = cargar_reservas()
                             
-                            df_validas_refresh = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
+                            df_validas_refresh = st.session_state.reservas[
+                                (st.session_state.reservas["Estado"] != "Eliminado") & 
+                                (st.session_state.reservas["Semana"] == str_semana)
+                            ] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
                             
                             for res in reservas_temporales:
                                 d, h = res["Día"], res["Horario"]
@@ -767,9 +712,7 @@ if st.session_state.rol_actual == "Admin":
                             
                             if cruces: st.error("⚠️ **Cruce detectado:** Otros docentes acaban de separar estos recursos.")
                             else:
-                                ts = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
                                 for r in reservas_temporales:
-                                    r["Fecha/Hora Registro"] = ts
                                     del r["List_Amb"]; del r["List_Eq"]
                                 df_final = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
                                 if guardar_reservas_en_nube(df_final):
@@ -864,13 +807,15 @@ elif st.session_state.rol_actual == "Docente":
                                 st.warning("⚠️ **Atención:** Algún recurso seleccionado ya está ocupado.")
                                 
                             col_mat, col_op = st.columns([3, 1])
-                            with col_mat: m_sel = st.text_input("🛠️ Materiales extra", key=f"m_{d}_{h}_{st.session_state.form_key}")
+                            with col_mat: m_sel = st.text_input("🛠️ Materiales extra (Ej. Dinamómetro)", key=f"m_{d}_{h}_{st.session_state.form_key}")
                             with col_op:
                                 st.write(""); st.write("")
                                 req_operario = st.checkbox("👷 Requiere Operario", key=f"op_{d}_{h}_{st.session_state.form_key}")
                             st.markdown('</div>', unsafe_allow_html=True)
                             
                             reservas_temporales.append({
+                                "ID_Reserva": str(uuid.uuid4()),
+                                "Semana": str_semana,
                                 "Día": d, "Horario": h, "Profesor": profesor, 
                                 "Ambientes": ", ".join(a_sel) if a_sel else "(Ninguno)", 
                                 "Equipos": ", ".join(e_sel) if e_sel else "(Ninguno)", 
@@ -908,7 +853,10 @@ elif st.session_state.rol_actual == "Docente":
                             cruces = []
                             st.session_state.reservas = cargar_reservas()
                             
-                            df_validas_refresh = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
+                            df_validas_refresh = st.session_state.reservas[
+                                (st.session_state.reservas["Estado"] != "Eliminado") & 
+                                (st.session_state.reservas["Semana"] == str_semana)
+                            ] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
                             
                             for res in reservas_temporales:
                                 d, h = res["Día"], res["Horario"]
@@ -920,9 +868,7 @@ elif st.session_state.rol_actual == "Docente":
                         
                         if cruces: st.error("⚠️ **Cruce detectado:** Otros docentes acaban de separar estos recursos.")
                         else:
-                            ts = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
                             for r in reservas_temporales:
-                                r["Fecha/Hora Registro"] = ts
                                 del r["List_Amb"]; del r["List_Eq"]
                             df_final = pd.concat([st.session_state.reservas, pd.DataFrame(reservas_temporales)], ignore_index=True)
                             if guardar_reservas_en_nube(df_final):
@@ -936,25 +882,32 @@ elif st.session_state.rol_actual == "Docente":
                             else: st.error("Error guardando en Google Sheets.")
 
     with tab_mis_reservas:
-        st.subheader("🗑️ Anular Mis Reservas Activas")
+        st.subheader("🗑️ Anular Mis Reservas Activas (Semana Actual)")
         st.write("Si cometió un error o desea cancelar una clase, seleccione la reserva y proceda a anularla. Esta acción liberará el espacio para otros docentes.")
         
         mis_reservas = df_validas[df_validas["Profesor"] == st.session_state.nombre_oficial].copy()
         
         if not mis_reservas.empty:
-            columnas_orden_mis = ["Fecha/Hora Registro", "Día", "Horario", "Ambientes", "Equipos", "Materiales", "Operario"]
+            columnas_orden_mis = ["ID_Reserva", "Fecha/Hora Registro", "Día", "Horario", "Ambientes", "Equipos", "Materiales", "Operario"]
             df_mostrar_mis = mis_reservas[[c for c in columnas_orden_mis if c in mis_reservas.columns]].copy()
             df_mostrar_mis.insert(0, "❌ Anular", False)
             
-            df_editado_mis = st.data_editor(df_mostrar_mis, use_container_width=True)
+            df_editado_mis = st.data_editor(
+                df_mostrar_mis, 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={"ID_Reserva": None} # Oculta el ID de la vista
+            )
             
             if st.button("🗑️ Procesar Anulación de Seleccionadas"):
                 with st.spinner('⏳ Liberando espacios en la nube...'):
-                    borrados_indices_mis = df_editado_mis[df_editado_mis["❌ Anular"] == True].index
+                    ids_a_borrar_mis = df_editado_mis[df_editado_mis["❌ Anular"] == True]["ID_Reserva"].tolist()
                     
-                    if len(borrados_indices_mis) > 0:
+                    if len(ids_a_borrar_mis) > 0:
                         ts_elim = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
-                        for idx in borrados_indices_mis:
+                            
+                        for id_res in ids_a_borrar_mis:
+                            idx = st.session_state.reservas[st.session_state.reservas["ID_Reserva"] == id_res].index[0]
                             st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
                             st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
                             st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
