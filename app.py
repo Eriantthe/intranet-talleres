@@ -7,6 +7,17 @@ import time
 import requests
 import json
 
+# === GENERADOR DE PDF NATIVO ===
+try:
+    from reportlab.lib.pagesizes import landscape, A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    import io
+    PDF_ACTIVO = True
+except ImportError:
+    PDF_ACTIVO = False
+
 # === ENLACES OFICIALES DE GOOGLE SHEETS ===
 URL_APPS_SCRIPT = "https://script.google.com/macros/s/AKfycbwoJ1ELyLOwr1ORFcWUcnwrcQpsyKj-6_0obweEBnq9P8HqdLlNQCAe8IDMdk8R4nIR/exec"
 URL_CSV_USUARIOS = "https://docs.google.com/spreadsheets/d/13e2p-qGmZrcUNERjJR9j-BUyGakT0Xsp1pffwZUfreM/export?format=csv&gid=1575432411"
@@ -67,6 +78,7 @@ def cargar_reservas():
             if "Estado" not in df.columns: df["Estado"] = "Activa"
             if "Eliminado_por" not in df.columns: df["Eliminado_por"] = ""
             if "Fecha_Eliminacion" not in df.columns: df["Fecha_Eliminacion"] = ""
+            if "Materiales" not in df.columns: df["Materiales"] = "(Ninguno)"
             return df
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
@@ -95,29 +107,38 @@ def guardar_reservas_en_nube(df):
         return False
 
 # --- VARIABLES DE ESTADO DE SESIÓN ---
-if "rol_actual" not in st.session_state:
-    st.session_state.rol_actual = None  
-if "usuario_actual" not in st.session_state:
-    st.session_state.usuario_actual = ""
-if "nombre_saludo" not in st.session_state:
-    st.session_state.nombre_saludo = ""
-if "nombre_oficial" not in st.session_state:
-    st.session_state.nombre_oficial = ""
-if "form_key" not in st.session_state:
-    st.session_state.form_key = 0
-if "mostrar_exito" not in st.session_state:
-    st.session_state.mostrar_exito = False
+if "rol_actual" not in st.session_state: st.session_state.rol_actual = None  
+if "usuario_actual" not in st.session_state: st.session_state.usuario_actual = ""
+if "nombre_saludo" not in st.session_state: st.session_state.nombre_saludo = ""
+if "nombre_oficial" not in st.session_state: st.session_state.nombre_oficial = ""
+if "form_key" not in st.session_state: st.session_state.form_key = 0
+if "mostrar_exito" not in st.session_state: st.session_state.mostrar_exito = False
 if "reservas" not in st.session_state or st.session_state.reservas.empty:
     st.session_state.reservas = cargar_reservas()
 
+# ==========================================
+# LÓGICA DE TIEMPO Y CAMBIO DE SEMANA EXACTO
+# ==========================================
 tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
-dias_para_lunes = 7 - ahora.weekday()
-lunes_obj = ahora + timedelta(days=dias_para_lunes)
+wd = ahora.weekday()
+
+# El sistema cierra a las 23:59 del Jueves, por lo que el Viernes de 00:00 a 07:59 está cerrado.
+# A partir de las 8:00am del Viernes, empieza la reserva de la NUEVA semana (salto de 1 semana más)
+if wd == 4 and ahora.hour >= 8: # Viernes (después de 8am)
+    dias_al_lunes = 10
+elif wd == 5: # Sábado
+    dias_al_lunes = 9
+elif wd == 6: # Domingo
+    dias_al_lunes = 8
+else: # Lunes a Jueves (y Viernes madrugada)
+    dias_al_lunes = 7 - wd
+
+lunes_obj = ahora + timedelta(days=dias_al_lunes)
 viernes_obj = lunes_obj + timedelta(days=4)
 str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime('%d/%m')}"
 
-formulario_cerrado = False 
+formulario_cerrado = (wd == 4 and ahora.hour < 8)
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
 horas = ["08:00 am - 09:50 am", "11:00 am - 12:50 pm", "02:00 pm - 03:50 pm", "04:00 pm - 05:50 pm"]
@@ -227,11 +248,11 @@ st.markdown("""
         }
     }
     
-   /* MARCA DE AGUA FLOTANTE (CREADO POR NORELLY) - POSICIÓN CORREGIDA */
+    /* MARCA DE AGUA FLOTANTE */
     .marca-de-agua {
         position: fixed;
-        bottom: 30px; /* Más arriba para evitar la barra de Windows */
-        right: 180px; /* Más a la izquierda para evitar el menú de Streamlit */
+        bottom: 30px; 
+        right: 180px; 
         font-family: Arial, sans-serif;
         font-size: 13px;
         color: #7f8c8d;
@@ -244,7 +265,6 @@ st.markdown("""
     }
     </style>
     
-    <!-- INYECCIÓN HTML DE LA MARCA DE AGUA -->
     <div class="marca-de-agua">Desarrollado por <b>Norelly Cárdenas</b></div>
 """, unsafe_allow_html=True)
 
@@ -482,11 +502,6 @@ if st.session_state.rol_actual == "Admin":
     with tab_reservas:
         st.subheader("Borrador de Reservas Activas")
         
-        if "Estado" not in st.session_state.reservas.columns:
-            st.session_state.reservas["Estado"] = "Activa"
-            st.session_state.reservas["Eliminado_por"] = ""
-            st.session_state.reservas["Fecha_Eliminacion"] = ""
-            
         df_activas = st.session_state.reservas[st.session_state.reservas["Estado"] != "Eliminado"].copy()
         
         columnas_orden = ["Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
@@ -525,8 +540,64 @@ if st.session_state.rol_actual == "Admin":
             st.write("No hay registros eliminados en la papelera.")
             
     with tab_horario:
-        st.subheader(f"Generar Horario Coloreado para PDF ({str_semana})")
+        st.subheader(f"🖨️ Exportar Horario ({str_semana})")
         
+        if PDF_ACTIVO:
+            def generar_pdf():
+                buffer = io.BytesIO()
+                doc = SimpleDocTemplate(buffer, pagesize=landscape(A4), rightMargin=20, leftMargin=20, topMargin=20, bottomMargin=20)
+                elements = []
+                styles = getSampleStyleSheet()
+                elements.append(Paragraph(f"<b>CRONOGRAMA DE USO DE TALLERES Y EQUIPOS - SIMA ({str_semana})</b>", styles['Title']))
+                elements.append(Paragraph("<br/>", styles['Normal']))
+                
+                data = [["Hora", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]]
+                
+                for h in horas:
+                    row = [h]
+                    for d in dias:
+                        reserva = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
+                        if not reserva.empty:
+                            texto = ""
+                            for _, r in reserva.iterrows():
+                                op = " [C/ Operario]" if r.get("Operario") == "Sí" else ""
+                                mat = str(r.get('Materiales', '-'))
+                                if not mat or mat.lower() == "nan" or mat == "(Ninguno)": mat = "-"
+                                texto += f"• {r['Profesor']}{op}\nAmb: {r['Ambientes']}\nEq: {r['Equipos']}\nMat: {mat}\n\n"
+                            row.append(texto.strip())
+                        else:
+                            row.append("Libre")
+                    data.append(row)
+                    
+                t = Table(data, colWidths=[80, 130, 130, 130, 130, 130])
+                t.setStyle(TableStyle([
+                    ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#006b3f")),
+                    ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
+                    ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+                    ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+                    ('FONTNAME', (0,0), (-1,0), 'Helvetica-Bold'),
+                    ('GRID', (0,0), (-1,-1), 1, colors.black),
+                    ('FONTSIZE', (0,0), (-1,-1), 8),
+                    ('BACKGROUND', (0,1), (0,-1), colors.lightgrey),
+                ]))
+                elements.append(t)
+                doc.build(elements)
+                buffer.seek(0)
+                return buffer
+                
+            pdf_data = generar_pdf()
+            st.download_button(
+                label="📥 DESCARGAR PDF NATIVO",
+                data=pdf_data,
+                file_name=f"Horario_SIMA_{lunes_obj.strftime('%d_%m')}.pdf",
+                mime="application/pdf",
+                type="primary"
+            )
+        else:
+            st.warning("⚠️ Para descargar en formato PDF nativo, por favor agrega **reportlab** a tu archivo de *requirements.txt*.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        # Vista HTML original con materiales agregados
         html_table = f"""<html><head><meta charset="utf-8">
         <style>
             table {{ width: 100%; border-collapse: collapse; font-family: Arial; font-size: 12px; }}
@@ -535,8 +606,7 @@ if st.session_state.rol_actual == "Admin":
             .hora {{ background-color: #f2f2f2; font-weight: bold; text-align: center; vertical-align: middle; }}
             .tarjeta-reserva {{ padding: 8px; border-radius: 6px; margin-bottom: 6px; border: 1px solid rgba(0,0,0,0.15); }}
         </style></head><body>
-        <h2 style="text-align: center; color: #006b3f; font-family: Arial;">CRONOGRAMA DE USO DE TALLERES Y EQUIPOS - SIMA</h2>
-        <h4 style='text-align: center; color: #333; font-family: Arial;'>{str_semana}</h4><table><tr><th>Hora</th>"""
+        <table><tr><th>Hora</th>"""
         
         for d in dias: html_table += f"<th>{d}</th>"
         html_table += "</tr>"
@@ -550,15 +620,16 @@ if st.session_state.rol_actual == "Admin":
                     for _, r in reserva.iterrows():
                         prof = r["Profesor"]
                         bg_color = obtener_color_profesor(prof) 
-                        fecha_reg = f"<small style='color:#555;'>({r.get('Fecha/Hora Registro', '')})</small><br>" if r.get('Fecha/Hora Registro', '') else ""
                         op_tag = " <b style='color:#b71c1c;'>[Requiere Operario]</b>" if r.get("Operario", "") == "Sí" else ""
+                        mat = str(r.get('Materiales', '-'))
+                        if not mat or mat.lower() == "nan" or mat == "(Ninguno)": mat = "-"
                         
                         contenido += f"""
                         <div class="tarjeta-reserva" style="background-color: {bg_color};">
                             <b>{prof}</b>{op_tag}<br>
-                            {fecha_reg}
                             <i>Amb.:</i> {r['Ambientes']}<br>
-                            <i>Eq.:</i> {r['Equipos']}
+                            <i>Eq.:</i> {r['Equipos']}<br>
+                            <i>Mat.:</i> <b>{mat}</b>
                         </div>"""
                     html_table += f"<td>{contenido}</td>"
                 else: 
@@ -567,7 +638,6 @@ if st.session_state.rol_actual == "Admin":
         html_table += "</table></body></html>"
         
         st.components.v1.html(html_table, height=600, scrolling=True)
-        st.download_button("📄 Descargar Horario (PDF)", html_table, "Horario_Coloreado.html", "text/html")
 
     with tab_hacer_reserva:
         st.subheader("🗓️ Separación Semanal de Ambientes y Equipos")
@@ -580,8 +650,8 @@ if st.session_state.rol_actual == "Admin":
         if formulario_cerrado:
             st.error("🔒 **SISTEMA CERRADO.** El plazo para reservas venció el jueves a la medianoche. El sistema se reabrirá el viernes a las 8:00 am para la próxima semana.")
         else:
-            st.info(f"✅ **SISTEMA ABIERTO.** Para la **{str_semana}**.")
-            st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
+            st.info(f"✅ **SISTEMA ABIERTO.** Registrando horarios para la **{str_semana}**.")
+            st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** inicia el registro de la siguiente semana.")
             
             if st.button("🔄 Actualizar Disponibilidad (Admin)"):
                 with st.spinner("🔄 Actualizando..."):
@@ -641,7 +711,7 @@ if st.session_state.rol_actual == "Admin":
                                 st.warning("⚠️ **Atención:** Algún recurso seleccionado ya está ocupado.")
                                 
                             col_mat, col_op = st.columns([3, 1])
-                            with col_mat: m_sel = st.text_input("🛠️ Materiales extra", key=f"m_admin_{d}_{h}_{st.session_state.form_key}")
+                            with col_mat: m_sel = st.text_input("🛠️ Materiales extra (Ej. Dinamómetro)", key=f"m_admin_{d}_{h}_{st.session_state.form_key}")
                             with col_op:
                                 st.write(""); st.write("")
                                 req_operario = st.checkbox("👷 Requiere Operario", key=f"op_admin_{d}_{h}_{st.session_state.form_key}")
@@ -725,7 +795,6 @@ elif st.session_state.rol_actual == "Docente":
     
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
-    # --- PESTAÑAS PARA EL DOCENTE ---
     tab_reservar, tab_mis_reservas = st.tabs(["📝 Hacer Reserva", "🗑️ Mis Reservas"])
     
     with tab_reservar:
@@ -737,8 +806,8 @@ elif st.session_state.rol_actual == "Docente":
         if formulario_cerrado:
             st.error("🔒 **SISTEMA CERRADO.** El plazo para reservas venció el jueves a la medianoche. El sistema se reabrirá el viernes a las 8:00 am para la próxima semana.")
         else:
-            st.info(f"✅ **SISTEMA ABIERTO.** Para la **{str_semana}**.")
-            st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** pueden registrar la semana entrante.")
+            st.info(f"✅ **SISTEMA ABIERTO.** Registrando horarios para la **{str_semana}**.")
+            st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** inicia el registro de la siguiente semana.")
             
             if st.button("🔄 Actualizar Disponibilidad"):
                 with st.spinner("🔄 Actualizando base de datos..."):
@@ -885,12 +954,6 @@ elif st.session_state.rol_actual == "Docente":
                     
                     if len(borrados_indices_mis) > 0:
                         ts_elim = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
-                        
-                        if "Estado" not in st.session_state.reservas.columns:
-                            st.session_state.reservas["Estado"] = "Activa"
-                            st.session_state.reservas["Eliminado_por"] = ""
-                            st.session_state.reservas["Fecha_Eliminacion"] = ""
-                            
                         for idx in borrados_indices_mis:
                             st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
                             st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
@@ -912,3 +975,22 @@ else:
     st.title("🚜 SIMA - Intranet de Talleres UNALM")
     st.markdown("### Sistema Oficial de Separación de Maquinaria e Implementos")
     st.info("👈 Por favor, ingrese sus credenciales en el menú lateral izquierdo para acceder a su perfil y separar recursos.")
+    st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** inicia el registro de la siguiente semana.")
+    
+    st.subheader("📊 Disponibilidad en Tiempo Real")
+    st.write(f"Estado general de los talleres para la **{str_semana}**")
+    
+    matriz = pd.DataFrame(index=horas, columns=dias)
+    matriz.fillna("🟢 Libre", inplace=True)
+    
+    for d in dias:
+        for h in horas:
+            acts = df_validas[(df_validas["Día"] == d) & (df_validas["Horario"] == h)]
+            if not acts.empty:
+                ocupados = []
+                for _, r in acts.iterrows():
+                    if str(r["Ambientes"]) != "(Ninguno)": ocupados.append(str(r["Ambientes"]))
+                    if str(r["Equipos"]) != "(Ninguno)": ocupados.append(str(r["Equipos"]))
+                matriz.at[h, d] = f"🔴 SEPARADO:\n{', '.join(ocupados)}"
+                
+    st.dataframe(matriz, use_container_width=True)
