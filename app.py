@@ -75,12 +75,14 @@ def cargar_reservas():
         data = r.json()
         if len(data) > 0:
             df = pd.DataFrame(data)
-            if "Estado" not in df.columns: df["Estado"] = "Activa"
-            if "Eliminado_por" not in df.columns: df["Eliminado_por"] = ""
-            if "Fecha_Eliminacion" not in df.columns: df["Fecha_Eliminacion"] = ""
+            # Asegurar todas las columnas necesarias para que funcione la base de datos
+            for col in ["Estado", "Eliminado_por", "Fecha_Eliminacion"]:
+                if col not in df.columns: df[col] = ""
             if "Materiales" not in df.columns: df["Materiales"] = "(Ninguno)"
-            if "Semana" not in df.columns: df["Semana"] = "Semana Antigua"
+            if "Semana" not in df.columns: df["Semana"] = "Historial"
             if "ID_Reserva" not in df.columns: df["ID_Reserva"] = [str(uuid.uuid4()) for _ in range(len(df))]
+            
+            df["Estado"] = df["Estado"].replace("", "Activa")
             return df
     except Exception as e:
         st.sidebar.error("Problema de conexión con Google Sheets.")
@@ -117,20 +119,20 @@ tz_lima = pytz.timezone('America/Lima')
 ahora = datetime.now(tz_lima)
 wd = ahora.weekday() # 0=Lunes, 3=Jueves, 4=Viernes
 
-if wd == 4 and ahora.hour >= 8: # Viernes después de las 8:00 am -> Salta a la próxima semana
+if wd == 4 and ahora.hour >= 8: # Viernes después de las 8:00 am (salta de semana)
     dias_al_lunes = 10
 elif wd == 5: # Sábado
     dias_al_lunes = 9
 elif wd == 6: # Domingo
     dias_al_lunes = 8
-else: # Lunes a Jueves (y Viernes madrugada) -> Semana inminente
+else: # Lunes a Jueves
     dias_al_lunes = 7 - wd
 
 lunes_obj = ahora + timedelta(days=dias_al_lunes)
 viernes_obj = lunes_obj + timedelta(days=4)
 str_semana = f"Semana del {lunes_obj.strftime('%d/%m')} al {viernes_obj.strftime('%d/%m')}"
 
-# Cierra el jueves a la medianoche (que técnicamente es viernes de 00:00 a 07:59 am)
+# Cierra el jueves a la medianoche
 formulario_cerrado = (wd == 4 and ahora.hour < 8)
 
 dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes"]
@@ -168,7 +170,7 @@ def obtener_color_profesor(prof_nombre):
     if "ALATA" in prof_upper: return "#9BF6FF"          
     return "#E5E5E5"                                    
 
-# --- ESTILO VISUAL Y MARCA DE AGUA CORREGIDA ---
+# --- ESTILO VISUAL Y MARCA DE AGUA MOVIDA ---
 st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
@@ -198,11 +200,11 @@ st.markdown("""
 
     @media (max-width: 768px) { section[data-testid="stSidebar"] { width: 100% !important; min-width: 100% !important; } }
     
-    /* MARCA DE AGUA CORREGIDA (Más a la izquierda y arriba) */
+    /* MARCA DE AGUA (Movida a la izquierda para que nada la tape) */
     .marca-de-agua {
         position: fixed;
-        bottom: 30px; 
-        right: 180px; 
+        bottom: 25px; 
+        left: 25px; 
         font-family: Arial, sans-serif;
         font-size: 13px;
         color: #7f8c8d;
@@ -218,14 +220,14 @@ st.markdown("""
     <div class="marca-de-agua">Desarrollado por <b>Norelly Cárdenas</b></div>
 """, unsafe_allow_html=True)
 
-# FILTRO GLOBAL: Mostrar solo reservas ACTIVAS y de la SEMANA ACTUAL en curso
-if not st.session_state.reservas.empty and "Estado" in st.session_state.reservas.columns:
+# FILTRO GLOBAL: Mostrar solo reservas de la SEMANA ACTUAL en curso y que no estén eliminadas
+if not st.session_state.reservas.empty:
     df_validas = st.session_state.reservas[
         (st.session_state.reservas["Estado"] != "Eliminado") & 
         (st.session_state.reservas["Semana"] == str_semana)
     ]
 else:
-    df_validas = st.session_state.reservas
+    df_validas = pd.DataFrame()
 
 # --- MENÚ LATERAL DE AUTENTICACIÓN ---
 st.sidebar.markdown("### 🚜 SIMA - UNALM")
@@ -440,9 +442,9 @@ if st.session_state.rol_actual == "Admin":
                         st.error(f"Error de conexión: {e}")
 
     with tab_reservas:
-        st.subheader("Borrador de Reservas Activas (Semana Actual)")
+        st.subheader(f"Borrador de Reservas Activas ({str_semana})")
         
-        columnas_orden = ["ID_Reserva", "Fecha/Hora Registro", "Semana", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
+        columnas_orden = ["ID_Reserva", "Fecha/Hora Registro", "Día", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
         df_mostrar = df_validas[[c for c in columnas_orden if c in df_validas.columns]].copy()
         df_mostrar.insert(0, "❌ Borrar", False)
         
@@ -459,17 +461,22 @@ if st.session_state.rol_actual == "Admin":
                 
                 if len(ids_a_borrar) > 0:
                     ts_elim = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
+                    
+                    # Usa el ID exacto para borrar sin equivocarse
                     for id_res in ids_a_borrar:
-                        # Busca el ID exacto en la base original
-                        idx = st.session_state.reservas[st.session_state.reservas["ID_Reserva"] == id_res].index[0]
-                        st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
-                        st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
-                        st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
+                        filtro = st.session_state.reservas["ID_Reserva"] == id_res
+                        if filtro.any():
+                            idx = st.session_state.reservas[filtro].index[0]
+                            st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
+                            st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
+                            st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
                         
-                    guardar_reservas_en_nube(st.session_state.reservas)
-                    st.success("✅ Reservas enviadas a la papelera / historial.")
-                    time.sleep(2)
-                    st.rerun()
+                    if guardar_reservas_en_nube(st.session_state.reservas):
+                        st.success("✅ Reservas enviadas a la papelera.")
+                        time.sleep(2)
+                        st.rerun()
+                    else:
+                        st.error("Error al comunicarse con Google Sheets.")
                 else:
                     st.info("No marcaste ninguna reserva para borrar.")
                     
@@ -700,15 +707,16 @@ if st.session_state.rol_actual == "Admin":
                             df_validas_refresh = st.session_state.reservas[
                                 (st.session_state.reservas["Estado"] != "Eliminado") & 
                                 (st.session_state.reservas["Semana"] == str_semana)
-                            ] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
+                            ] if not st.session_state.reservas.empty else pd.DataFrame()
                             
                             for res in reservas_temporales:
                                 d, h = res["Día"], res["Horario"]
-                                for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
-                                    amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
-                                    eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
-                                    if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
-                                        cruces.append(f"{d} a las {h}")
+                                if not df_validas_refresh.empty:
+                                    for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
+                                        amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
+                                        eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
+                                        if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
+                                            cruces.append(f"{d} a las {h}")
                             
                             if cruces: st.error("⚠️ **Cruce detectado:** Otros docentes acaban de separar estos recursos.")
                             else:
@@ -856,15 +864,16 @@ elif st.session_state.rol_actual == "Docente":
                             df_validas_refresh = st.session_state.reservas[
                                 (st.session_state.reservas["Estado"] != "Eliminado") & 
                                 (st.session_state.reservas["Semana"] == str_semana)
-                            ] if "Estado" in st.session_state.reservas.columns else st.session_state.reservas
+                            ] if not st.session_state.reservas.empty else pd.DataFrame()
                             
                             for res in reservas_temporales:
                                 d, h = res["Día"], res["Horario"]
-                                for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
-                                    amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
-                                    eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
-                                    if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
-                                        cruces.append(f"{d} a las {h}")
+                                if not df_validas_refresh.empty:
+                                    for _, act in df_validas_refresh[(df_validas_refresh["Día"] == d) & (df_validas_refresh["Horario"] == h)].iterrows():
+                                        amb_act = set([a.strip() for a in str(act["Ambientes"]).split(",") if a.strip() and a.strip() != "(Ninguno)"])
+                                        eq_act = set([e.strip() for e in str(act["Equipos"]).split(",") if e.strip() and e.strip() != "(Ninguno)"])
+                                        if [a for a in res["List_Amb"] if a in amb_act and a != "Campo"] or [e for e in res["List_Eq"] if e in eq_act and e != "Ningún Equipo en particular"]:
+                                            cruces.append(f"{d} a las {h}")
                         
                         if cruces: st.error("⚠️ **Cruce detectado:** Otros docentes acaban de separar estos recursos.")
                         else:
@@ -882,7 +891,7 @@ elif st.session_state.rol_actual == "Docente":
                             else: st.error("Error guardando en Google Sheets.")
 
     with tab_mis_reservas:
-        st.subheader("🗑️ Anular Mis Reservas Activas (Semana Actual)")
+        st.subheader(f"🗑️ Anular Mis Reservas Activas ({str_semana})")
         st.write("Si cometió un error o desea cancelar una clase, seleccione la reserva y proceda a anularla. Esta acción liberará el espacio para otros docentes.")
         
         mis_reservas = df_validas[df_validas["Profesor"] == st.session_state.nombre_oficial].copy()
@@ -907,15 +916,19 @@ elif st.session_state.rol_actual == "Docente":
                         ts_elim = datetime.now(tz_lima).strftime("%d/%m/%Y %I:%M %p")
                             
                         for id_res in ids_a_borrar_mis:
-                            idx = st.session_state.reservas[st.session_state.reservas["ID_Reserva"] == id_res].index[0]
-                            st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
-                            st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
-                            st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
+                            filtro = st.session_state.reservas["ID_Reserva"] == id_res
+                            if filtro.any():
+                                idx = st.session_state.reservas[filtro].index[0]
+                                st.session_state.reservas.at[idx, "Estado"] = "Eliminado"
+                                st.session_state.reservas.at[idx, "Eliminado_por"] = st.session_state.nombre_saludo
+                                st.session_state.reservas.at[idx, "Fecha_Eliminacion"] = ts_elim
                             
-                        guardar_reservas_en_nube(st.session_state.reservas)
-                        st.success("✅ Reservas anuladas correctamente. El espacio ya está libre.")
-                        time.sleep(2)
-                        st.rerun()
+                        if guardar_reservas_en_nube(st.session_state.reservas):
+                            st.success("✅ Reservas anuladas correctamente. El espacio ya está libre.")
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error("Error al comunicarse con Google Sheets.")
                     else:
                         st.info("No marcaste ninguna reserva para anular.")
         else:
@@ -927,6 +940,27 @@ elif st.session_state.rol_actual == "Docente":
 else:
     st.title("🚜 SIMA - Intranet de Talleres UNALM")
     st.markdown("### Sistema Oficial de Separación de Maquinaria e Implementos")
+    
+    st.markdown("""
+        <style>
+        .marca-de-agua-publica {
+            position: fixed;
+            bottom: 25px; 
+            left: 25px; 
+            font-family: Arial, sans-serif;
+            font-size: 13px;
+            color: #7f8c8d;
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 8px;
+            box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+            z-index: 9999;
+            pointer-events: none;
+        }
+        </style>
+        <div class="marca-de-agua-publica">Desarrollado por <b>Norelly Cárdenas</b></div>
+    """, unsafe_allow_html=True)
+
     st.info("👈 Por favor, ingrese sus credenciales en el menú lateral izquierdo para acceder a su perfil y separar recursos.")
     st.warning("⏱️ **RECORDATORIO IMPORTANTE:** El horario se cierra los **jueves a la medianoche (12:00 am)** y los **viernes desde las 8:00 am** inicia el registro de la siguiente semana.")
     
