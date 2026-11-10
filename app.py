@@ -227,6 +227,12 @@ st.markdown("""
         width: 250px !important;
     }
     
+    /* ELIMINAR EL CUADRO BLANCO DEL MENÚ */
+    div[data-testid="stVerticalBlock"] > div > div > div.css-1r6slb0, 
+    div.st-emotion-cache-1r6slb0 {
+        background-color: transparent !important;
+    }
+    
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -358,6 +364,7 @@ with st.sidebar:
                 st.markdown(f'<div class="caja-sesion">👑 Administrador<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             
             if MENU_ACTIVO:
+                # Se eliminó background-color para heredar el verde transparente y color se fijó a blanco
                 menu_seleccionado = option_menu(
                     menu_title=None,
                     options=["Hacer Reserva", "Control Visual", "Evidencias", "Gestionar Reservas", "Exportar Horario"],
@@ -366,7 +373,7 @@ with st.sidebar:
                     styles={
                         "container": {"padding": "0px", "background-color": "transparent"},
                         "icon": {"color": "#69f0ae", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
+                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255,255,255,0.1)"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
@@ -386,7 +393,7 @@ with st.sidebar:
                     styles={
                         "container": {"padding": "0px", "background-color": "transparent"},
                         "icon": {"color": "#69f0ae", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
+                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255,255,255,0.1)"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
