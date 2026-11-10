@@ -221,8 +221,10 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
     
+    /* Reducción del ancho del sidebar */
     section[data-testid="stSidebar"] {
         background-color: #006b3f !important;
+        width: 250px !important;
     }
     
     .block-container {
@@ -237,7 +239,24 @@ st.markdown("""
     [data-testid="stSidebar"] label p { color: white !important; }
     input { color: black !important; background-color: white !important; }
     .stDataFrame { border: 2px solid #e6e6e6; border-radius: 8px; }
-    div.stButton > button:first-child { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
+    
+    /* Botón verde estandar principal */
+    div.stButton > button:first-child:not(.btn-cerrar) { background-color: #006b3f; color: white; border-color: #006b3f; font-weight: bold; }
+    
+    /* Estilo del botón Cerrar Sesión simulando texto */
+    .btn-cerrar {
+        background-color: transparent !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: none !important;
+        font-weight: normal !important;
+        text-decoration: underline !important;
+        padding-left: 0 !important;
+    }
+    .btn-cerrar:hover {
+        color: #69f0ae !important;
+        background-color: transparent !important;
+    }
     
     .caja-sesion { background-color: #e8f5e9; color: #006b3f; padding: 15px; border-radius: 10px; font-weight: bold; text-align: center; margin-bottom: 20px; border: 2px solid #69f0ae; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     
@@ -345,9 +364,9 @@ with st.sidebar:
                     icons=["calendar-plus", "speedometer2", "camera", "trash", "file-earmark-pdf"],
                     default_index=0,
                     styles={
-                        "container": {"padding": "5px", "background-color": "#ffffff", "border-radius": "8px"},
-                        "icon": {"color": "#006b3f", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px 0px", "color": "#333333", "--hover-color": "#e8f5e9"},
+                        "container": {"padding": "0px", "background-color": "transparent"},
+                        "icon": {"color": "#69f0ae", "font-size": "18px"}, 
+                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
@@ -365,14 +384,16 @@ with st.sidebar:
                     icons=["calendar-plus", "trash"],
                     default_index=0,
                     styles={
-                        "container": {"padding": "5px", "background-color": "#ffffff", "border-radius": "8px"},
-                        "icon": {"color": "#006b3f", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px 0px", "color": "#333333", "--hover-color": "#e8f5e9"},
+                        "container": {"padding": "0px", "background-color": "transparent"},
+                        "icon": {"color": "#69f0ae", "font-size": "18px"}, 
+                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
             
         st.markdown("<br><br>", unsafe_allow_html=True)
+        # Aplicamos un pequeño hack con HTML/CSS para que el botón de cerrar sesión se vea como texto
+        st.markdown("""<style>div.stButton > button:nth-of-type(1) { background-color: transparent; border: none; color: white; text-decoration: underline; padding-left:0; font-weight:normal; box-shadow:none;} div.stButton > button:nth-of-type(1):hover { color: #69f0ae; background-color: transparent;}</style>""", unsafe_allow_html=True)
         if st.button("Cerrar Sesión"):
             st.session_state.rol_actual = None
             st.session_state.usuario_actual = ""
@@ -956,7 +977,7 @@ if st.session_state.rol_actual == "Admin":
                                         st.error("Error guardando en Google Sheets.")
 
 # ==========================================
-# VISTA 2: DOCENTE NORMAL (CON PESTAÑA PARA BORRAR SUS RESERVAS)
+# VISTA 2: DOCENTE NORMAL
 # ==========================================
 elif st.session_state.rol_actual == "Docente":
 
