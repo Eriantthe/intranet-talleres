@@ -190,12 +190,8 @@ apoyos_lista = ["REVISIÓN - APOYO SUJELI", "REVISIÓN - APOYO JESÚS", "REVISI�
 def obtener_color_profesor(prof_nombre):
     prof_upper = str(prof_nombre).upper()
     
-    # Color para Apoyos y Revisión Semanal
     if "APOYO" in prof_upper or "REVISIÓN SEMANAL" in prof_upper: return "#e0e0e0"
-    
-    # Color propuesto para Visitas
     if "VISITA" in prof_upper: return "#fff9c4" 
-    
     if "ROJAS" in prof_upper: return "#FFD1DC"          
     if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#B5EAD7" 
     if "ALTAMIRANO" in prof_upper: return "#FFEAA7"     
@@ -600,16 +596,23 @@ if st.session_state.rol_actual == "Admin":
                 return None, None
                 
             profesores_en_bloque = reserva_df["Profesor"].tolist()
-            es_revision_total = ("REVISIÓN - APOYO SUJELI" in profesores_en_bloque and 
-                                 "REVISIÓN - APOYO JESÚS" in profesores_en_bloque and 
-                                 "REVISIÓN - APOYO LEANSY" in profesores_en_bloque)
+            
+            # --- CORRECCIÓN AQUÍ: Validación flexible para unificar la revisión semanal ---
+            # Comprueba que existan los 3 (buscando las palabras clave en lugar del string exacto)
+            hay_sujeli = any("SUJELI" in p.upper() for p in profesores_en_bloque)
+            hay_jesus = any("JESÚS" in p.upper() or "JESUS" in p.upper() for p in profesores_en_bloque)
+            hay_leansy = any("LEANSY" in p.upper() for p in profesores_en_bloque)
+            
+            es_revision_total = (hay_sujeli and hay_jesus and hay_leansy)
             
             if es_revision_total:
                 equipos_agrupados = set()
+                # Recoge los equipos solo de las personas que hacen la revisión
                 for _, r in reserva_df.iterrows():
-                    for eq in str(r["Equipos"]).split(","):
-                        if eq.strip() and eq.strip() != "(Ninguno)":
-                            equipos_agrupados.add(eq.strip())
+                    if "APOYO" in str(r["Profesor"]).upper() or "REVISIÓN" in str(r["Profesor"]).upper():
+                        for eq in str(r["Equipos"]).split(","):
+                            if eq.strip() and eq.strip() != "(Ninguno)":
+                                equipos_agrupados.add(eq.strip())
                 
                 texto_html = f"""
                 <div class="tarjeta-reserva" style="background-color: #e0e0e0; color: #333; text-align: center;">
@@ -986,9 +989,6 @@ elif st.session_state.rol_actual == "Docente":
             
             st.text_input("Docente Responsable (Autocompletado)", value=st.session_state.nombre_oficial, disabled=True)
             profesor = st.session_state.nombre_oficial
-            
-            def_amb = []
-            def_eq = []
             
             dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias, key=f"dias_main_{st.session_state.form_key}")
             reservas_temporales = []
