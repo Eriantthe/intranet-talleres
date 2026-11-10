@@ -183,13 +183,18 @@ profesores_lista = [
     "ROJAS ALEJANDRO, FRANCISCO", "GARCIA ARMAS, JUVENAL", "ALTAMIRANO CHUNGA, LUIS", 
     "CACERES GUERRERO, FREDY", "CHEVARRIA MOSCOSO, MARGARITA", "REBAZA PINO, ALFREDO", 
     "ZINGG ROSELL, AUGUSTO", "VASQUEZ CACERES, JAIME", "ORELLANA PARDAVE, JOSE", 
-    "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO", "ADMINISTRACIÓN - NORELLY", "ALATA REY, JOSUÉ ELIEZER"
+    "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO", "ADMINISTRACIÓN - NORELLY", "ALATA REY, JOSUÉ ELIEZER",
+    "REVISIÓN - APOYO SUJELI", "REVISIÓN - APOYO JESÚS", "REVISIÓN - APOYO LEANSY"
 ]
-# Separamos a los asistentes
-asistentes_lista = ["REVISIÓN - SUJELI", "REVISIÓN - JESÚS", "REVISIÓN - LEANSY"]
+# Separamos a los apoyos con la nueva nomenclatura
+apoyos_lista = ["REVISIÓN - APOYO SUJELI", "REVISIÓN - APOYO JESÚS", "REVISIÓN - APOYO LEANSY"]
 
 def obtener_color_profesor(prof_nombre):
     prof_upper = str(prof_nombre).upper()
+    
+    # Cualquier registro de APOYO será de color gris
+    if "APOYO" in prof_upper or "REVISIÓN SEMANAL" in prof_upper: return "#e0e0e0"
+    
     if "ROJAS" in prof_upper: return "#FFD1DC"          
     if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#B5EAD7" 
     if "ALTAMIRANO" in prof_upper: return "#FFEAA7"     
@@ -204,9 +209,7 @@ def obtener_color_profesor(prof_nombre):
     if "YARIN" in prof_upper or "YARÍN" in prof_upper: return "#FFC6FF" 
     if "NORELLY" in prof_upper: return "#FFB703"        
     if "ALATA" in prof_upper: return "#9BF6FF"   
-    if "REVISIÓN - SUJELI" in prof_upper: return "#ffcc80" 
-    if "REVISIÓN - JESÚS" in prof_upper: return "#81d4fa"  
-    if "REVISIÓN - LEANSY" in prof_upper: return "#a5d6a7" 
+    
     return "#E5E5E5"                                    
 
 # --- ESTILO VISUAL ---
@@ -247,6 +250,32 @@ st.markdown("""
         line-height: 1.5; 
         padding: 10px 25px 10px 5px; 
         display: inline-block; 
+    }
+    
+    /* Estilos personalizados para el st.segmented_control simulando la imagen de la píldora morada */
+    div[data-testid="stSegmentedControl"] > div {
+        background-color: white;
+        border: 2px solid #9c27b0;
+        border-radius: 30px;
+        padding: 2px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    div[data-testid="stSegmentedControl"] > div > label {
+        border-radius: 25px;
+        color: #9c27b0;
+        font-weight: bold;
+        border: none;
+    }
+    
+    div[data-testid="stSegmentedControl"] > div > label[data-checked="true"] {
+        background-color: #9c27b0 !important;
+        color: white !important;
+    }
+    
+    div[data-testid="stSegmentedControl"] > div > label:hover {
+        background-color: #f3e5f5;
+        color: #9c27b0;
     }
     
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
@@ -571,9 +600,9 @@ if st.session_state.rol_actual == "Admin":
                 return None, None
                 
             profesores_en_bloque = reserva_df["Profesor"].tolist()
-            es_revision_total = ("REVISIÓN - SUJELI" in profesores_en_bloque and 
-                                 "REVISIÓN - JESÚS" in profesores_en_bloque and 
-                                 "REVISIÓN - LEANSY" in profesores_en_bloque)
+            es_revision_total = ("REVISIÓN - APOYO SUJELI" in profesores_en_bloque and 
+                                 "REVISIÓN - APOYO JESÚS" in profesores_en_bloque and 
+                                 "REVISIÓN - APOYO LEANSY" in profesores_en_bloque)
             
             if es_revision_total:
                 equipos_agrupados = set()
@@ -649,7 +678,8 @@ if st.session_state.rol_actual == "Admin":
                 
                 for idx_row, row_data in enumerate(data):
                     for idx_col, cell_data in enumerate(row_data):
-                        if "REVISIÓN SEMANAL" in str(cell_data):
+                        # Pintar de gris si es REVISIÓN SEMANAL o si contiene la palabra APOYO (cualquiera de los ayudantes)
+                        if "REVISIÓN SEMANAL" in str(cell_data) or "APOYO" in str(cell_data):
                             t.setStyle(TableStyle([('BACKGROUND', (idx_col, idx_row), (idx_col, idx_row), colors.HexColor("#e0e0e0"))]))
 
                 elements.append(t)
@@ -734,8 +764,8 @@ if st.session_state.rol_actual == "Admin":
             
             st.subheader("📝 Formulario de Registro de Separación")
             
-            # --- NUEVA LÓGICA: SELECCIÓN MÚLTIPLE PARA ASISTENTES ---
-            tipo_reserva = st.radio("Tipo de Reserva", ["👨‍🏫 Docente Regular", "🛠️ Revisión de Asistentes"])
+            # --- USO DE CONTROL SEGMENTADO COMO "PÍLDORA" MORADA ---
+            tipo_reserva = st.segmented_control("Selecciona el propósito de la reserva", ["👨‍🏫 Docente Regular", "🛠️ Revisión de Apoyo"], default="👨‍🏫 Docente Regular")
             
             if tipo_reserva == "👨‍🏫 Docente Regular":
                 if st.session_state.usuario_actual == "Norelly2026":
@@ -744,8 +774,8 @@ if st.session_state.rol_actual == "Admin":
                     st.text_input("Docente Responsable (Autocompletado)", value=st.session_state.nombre_oficial, disabled=True)
                     profesores = [st.session_state.nombre_oficial]
             else:
-                st.info("💡 Selecciona a los asistentes que harán revisión. Si los seleccionas a los tres, en el horario se unificará como 'REVISIÓN SEMANAL'.")
-                profesores = st.multiselect("Asistentes encargados de la revisión", asistentes_lista, key=f"asistentes_{st.session_state.form_key}")
+                st.info("💡 Selecciona a los miembros de apoyo. Si los seleccionas a los tres en el mismo horario, en el cuadro final se unificará como 'REVISIÓN SEMANAL' en color gris.")
+                profesores = st.multiselect("Asistentes encargados de la revisión", apoyos_lista, key=f"asistentes_{st.session_state.form_key}")
             
             if profesores:
                 dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias, key=f"dias_main_admin_{st.session_state.form_key}")
@@ -771,17 +801,16 @@ if st.session_state.rol_actual == "Admin":
                                 def formatear_amb(n): return f"🔴 [OCUPADO] {n}" if n in amb_ya_ocupados else n
                                 def formatear_eq(n): return f"🔴 [OCUPADO] {n}" if n in eq_ya_ocupados else n
 
-                                # Validar preselección por profesor (si son varios asistentes, sumamos sus equipos)
                                 def_amb_set = set()
                                 def_eq_set = set()
                                 for p in profesores:
-                                    if "REVISIÓN - SUJELI" in p:
+                                    if "REVISIÓN - APOYO SUJELI" in p:
                                         def_amb_set.add("Pool")
                                         def_eq_set.update(["NH TD5.80", "NH TD5.100"])
-                                    elif "REVISIÓN - JESÚS" in p:
+                                    elif "REVISIÓN - APOYO JESÚS" in p:
                                         def_amb_set.add("Pool")
                                         def_eq_set.update(["NH B110B", "JD 3050B", "NH L223"])
-                                    elif "REVISIÓN - LEANSY" in p:
+                                    elif "REVISIÓN - APOYO LEANSY" in p:
                                         def_amb_set.add("Pool")
                                         def_eq_set.update(["NH TD90", "JD 1040"])
                                 
@@ -799,11 +828,9 @@ if st.session_state.rol_actual == "Admin":
                                     req_operario = st.checkbox("👷 Requiere Operario", key=f"op_admin_{d}_{h}_{st.session_state.form_key}")
                                 st.markdown('</div>', unsafe_allow_html=True)
                                 
-                                # Si elegiste varios profesores (ej. 3 asistentes), guardamos un registro individual por cada uno en el Excel.
                                 for p in profesores:
                                     eq_especificos = e_sel
-                                    # Solo filtramos si es revisión y eligieron varios asistentes al mismo tiempo
-                                    if tipo_reserva == "🛠️ Revisión de Asistentes" and len(profesores) > 1:
+                                    if tipo_reserva == "🛠️ Revisión de Apoyo" and len(profesores) > 1:
                                         eq_p = []
                                         if "SUJELI" in p: eq_p = [eq for eq in e_sel if eq in ["NH TD5.80", "NH TD5.100"]]
                                         elif "JESÚS" in p: eq_p = [eq for eq in e_sel if eq in ["NH B110B", "JD 3050B", "NH L223"]]
@@ -942,6 +969,9 @@ elif st.session_state.rol_actual == "Docente":
             st.text_input("Docente Responsable (Autocompletado)", value=st.session_state.nombre_oficial, disabled=True)
             profesor = st.session_state.nombre_oficial
             
+            def_amb = []
+            def_eq = []
+            
             dias_sel = st.multiselect("1. Seleccione los días de práctica:", dias, key=f"dias_main_{st.session_state.form_key}")
             reservas_temporales = []
             
@@ -970,7 +1000,7 @@ elif st.session_state.rol_actual == "Docente":
                             with col_e: e_sel = st.multiselect("🚜 Equipos", equipos_base, format_func=formatear_eq, key=f"e_{d}_{h}_{st.session_state.form_key}")
                             
                             if [a for a in a_sel if a in amb_ya_ocupados] or [e for e in e_sel if e in eq_ya_ocupados]:
-                                st.warning("⚠️ **Atención:** Algún recurso seleccionado ya está ocupado.")
+                                st.warning("⚠️ **Atención:** Algún recurso preseleccionado ya está ocupado.")
                                 
                             col_mat, col_op = st.columns([3, 1])
                             with col_mat: m_sel = st.text_input("🛠️ Materiales extra", key=f"m_{d}_{h}_{st.session_state.form_key}")
