@@ -8,6 +8,13 @@ import requests
 import json
 import uuid
 
+# === LIBRERÍA DE MENÚ PROFESIONAL ===
+try:
+    from streamlit_option_menu import option_menu
+    MENU_ACTIVO = True
+except ImportError:
+    MENU_ACTIVO = False
+
 # === GENERADOR DE PDF NATIVO ===
 try:
     from reportlab.lib.pagesizes import landscape, A4
@@ -216,7 +223,6 @@ st.markdown("""
     
     section[data-testid="stSidebar"] {
         background-color: #006b3f !important;
-        width: 380px;
     }
     
     .block-container {
@@ -256,22 +262,14 @@ st.markdown("""
         padding: 2px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    
     div[data-testid="stSegmentedControl"] > div > label {
-        border-radius: 25px;
-        color: #9c27b0;
-        font-weight: bold;
-        border: none;
+        border-radius: 25px; color: #9c27b0; font-weight: bold; border: none;
     }
-    
     div[data-testid="stSegmentedControl"] > div > label[data-checked="true"] {
-        background-color: #9c27b0 !important;
-        color: white !important;
+        background-color: #9c27b0 !important; color: white !important;
     }
-    
     div[data-testid="stSegmentedControl"] > div > label:hover {
-        background-color: #f3e5f5;
-        color: #9c27b0;
+        background-color: #f3e5f5; color: #9c27b0;
     }
     
     .bloque-dia { background-color: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 15px; margin-bottom: 15px; border-left: 6px solid #006b3f;}
@@ -282,11 +280,6 @@ st.markdown("""
     .icono-fluido { font-size: 40px; margin-bottom: 5px; }
     .valor-fluido { font-size: 24px; font-weight: bold; color: #2c3e50; margin: 0; }
     .titulo-fluido { font-size: 12px; color: #7f8c8d; text-transform: uppercase; font-weight: bold; letter-spacing: 0.5px;}
-    
-    .stTabs [data-baseweb="tab-list"] { gap: 15px; overflow-x: visible !important; }
-    .stTabs [data-baseweb="tab"] { background-color: #f0f2f6; border-radius: 8px 8px 0px 0px; padding: 12px 25px !important; font-weight: bold !important; font-size: 17px !important; min-width: fit-content !important; white-space: nowrap !important; overflow: visible !important; }
-    .stTabs [data-baseweb="tab"] span { overflow: visible !important; white-space: nowrap !important; }
-    .stTabs [aria-selected="true"] { background-color: #006b3f !important; color: white !important; border-bottom: 4px solid #69f0ae !important; }
 
     .marca-de-agua {
         position: fixed;
@@ -327,54 +320,92 @@ if not st.session_state.reservas.empty:
 else:
     df_validas = pd.DataFrame(columns=columnas_requeridas)
 
-# --- MENÚ LATERAL DE AUTENTICACIÓN ---
-st.sidebar.markdown("### 🚜 SIMA - UNALM")
-st.sidebar.markdown("Sistema de Maquinaria Agrícola.")
-st.sidebar.markdown("<br><br><br>", unsafe_allow_html=True)
+# --- MENÚ LATERAL DE AUTENTICACIÓN Y NAVEGACIÓN ---
+if not MENU_ACTIVO:
+    st.error("⚠️ Falta instalar 'streamlit-option-menu' en tu requirements.txt para usar el nuevo diseño de navegación.")
 
-if st.session_state.rol_actual:
-    if st.session_state.rol_actual == "Admin":
-        if st.session_state.usuario_actual == "Norelly2026":
-            st.sidebar.markdown(f'<div class="caja-sesion">👑 Super Admin<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
-        else:
-            st.sidebar.markdown(f'<div class="caja-sesion">👑 Administrador<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
-    elif st.session_state.rol_actual == "Docente":
-        if "MARGARITA" in st.session_state.nombre_saludo.upper():
-            st.sidebar.markdown(f'<div class="caja-sesion">👩‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ingeniera {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
-        else:
-            st.sidebar.markdown(f'<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
-        
-    st.sidebar.markdown("<br>", unsafe_allow_html=True)
-    if st.sidebar.button("Cerrar Sesión"):
-        st.session_state.rol_actual = None
-        st.session_state.usuario_actual = ""
-        st.session_state.nombre_saludo = ""
-        st.session_state.nombre_oficial = ""
-        st.rerun()
-else:
-    st.sidebar.markdown("### 🔐 Acceso al Sistema")
-    usuario_input = st.sidebar.text_input("Usuario")
-    clave_input = st.sidebar.text_input("Contraseña", type="password")
-    if st.sidebar.button("Entrar"):
-        docentes_dict = cargar_docentes()
-        if usuario_input == "Norelly2026" and clave_input == "Pool2026":
-            st.session_state.rol_actual = "Admin"
-            st.session_state.usuario_actual = "Norelly2026"
-            st.session_state.nombre_saludo = "Norelly"
-            st.session_state.nombre_oficial = "ADMINISTRACIÓN - NORELLY"
-            st.rerun()
-        elif usuario_input == clave_input and usuario_input in docentes_dict:
-            datos_doc = docentes_dict[usuario_input]
-            if usuario_input == "41264537": 
-                st.session_state.rol_actual = "Admin"
+# Configuración de los botones del menú lateral según el rol
+menu_seleccionado = None
+
+with st.sidebar:
+    st.markdown("### 🚜 SIMA - UNALM")
+    st.markdown("Sistema de Maquinaria Agrícola.")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    if st.session_state.rol_actual:
+        if st.session_state.rol_actual == "Admin":
+            if st.session_state.usuario_actual == "Norelly2026":
+                st.markdown(f'<div class="caja-sesion">👑 Super Admin<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             else:
-                st.session_state.rol_actual = "Docente"
-            st.session_state.usuario_actual = usuario_input
-            st.session_state.nombre_saludo = datos_doc["saludo"]
-            st.session_state.nombre_oficial = datos_doc["oficial"]
+                st.markdown(f'<div class="caja-sesion">👑 Administrador<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
+            
+            # --- NUEVO MENÚ INTERACTIVO ADMIN ---
+            if MENU_ACTIVO:
+                menu_seleccionado = option_menu(
+                    menu_title=None,
+                    options=["Hacer Reserva", "Control Visual", "Evidencias", "Gestionar Reservas", "Exportar Horario"],
+                    icons=["calendar-plus", "speedometer2", "camera", "trash", "file-earmark-pdf"],
+                    default_index=0,
+                    styles={
+                        "container": {"padding": "5px", "background-color": "transparent"},
+                        "icon": {"color": "white", "font-size": "18px"}, 
+                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
+                        "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
+                    }
+                )
+
+        elif st.session_state.rol_actual == "Docente":
+            if "MARGARITA" in st.session_state.nombre_saludo.upper():
+                st.markdown(f'<div class="caja-sesion">👩‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ingeniera {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
+            else:
+                st.markdown(f'<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
+            
+            # --- NUEVO MENÚ INTERACTIVO DOCENTE ---
+            if MENU_ACTIVO:
+                menu_seleccionado = option_menu(
+                    menu_title=None,
+                    options=["Hacer Reserva", "Mis Reservas"],
+                    icons=["calendar-plus", "trash"],
+                    default_index=0,
+                    styles={
+                        "container": {"padding": "5px", "background-color": "transparent"},
+                        "icon": {"color": "white", "font-size": "18px"}, 
+                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
+                        "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
+                    }
+                )
+            
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        if st.button("Cerrar Sesión"):
+            st.session_state.rol_actual = None
+            st.session_state.usuario_actual = ""
+            st.session_state.nombre_saludo = ""
+            st.session_state.nombre_oficial = ""
             st.rerun()
-        else:
-            st.sidebar.error("Usuario o contraseña incorrectos.")
+    else:
+        st.markdown("### 🔐 Acceso al Sistema")
+        usuario_input = st.text_input("Usuario")
+        clave_input = st.text_input("Contraseña", type="password")
+        if st.button("Entrar"):
+            docentes_dict = cargar_docentes()
+            if usuario_input == "Norelly2026" and clave_input == "Pool2026":
+                st.session_state.rol_actual = "Admin"
+                st.session_state.usuario_actual = "Norelly2026"
+                st.session_state.nombre_saludo = "Norelly"
+                st.session_state.nombre_oficial = "ADMINISTRACIÓN - NORELLY"
+                st.rerun()
+            elif usuario_input == clave_input and usuario_input in docentes_dict:
+                datos_doc = docentes_dict[usuario_input]
+                if usuario_input == "41264537": 
+                    st.session_state.rol_actual = "Admin"
+                else:
+                    st.session_state.rol_actual = "Docente"
+                st.session_state.usuario_actual = usuario_input
+                st.session_state.nombre_saludo = datos_doc["saludo"]
+                st.session_state.nombre_oficial = datos_doc["oficial"]
+                st.rerun()
+            else:
+                st.error("Usuario o contraseña incorrectos.")
 
 # ==========================================
 # VISTA 1: ADMINISTRADOR (CONTROL TOTAL)
@@ -429,11 +460,8 @@ if st.session_state.rol_actual == "Admin":
     except Exception as e:
         error_excel = e
 
-    tab_maquinaria, tab_evidencias, tab_reservas, tab_horario, tab_hacer_reserva = st.tabs([
-        "🚜 Control Visual", "📸 Evidencias", "🗑️ Gestionar Reservas", "🖨️ Exportar Horario", "📝 Hacer Reserva"
-    ])
-    
-    with tab_maquinaria:
+    # --- SECCIÓN: CONTROL VISUAL ---
+    if menu_seleccionado == "Control Visual":
         st.subheader("Estado Analítico e Historial de Maquinaria")
         if error_excel:
             st.error(f"⚠️ Error procesando la hoja de registros: {error_excel}")
@@ -512,7 +540,8 @@ if st.session_state.rol_actual == "Admin":
                     fig.update_layout(yaxis=dict(range=[0, 105], title="Nivel Estimado (%)"))
                 st.plotly_chart(fig, use_container_width=True)
 
-    with tab_evidencias:
+    # --- SECCIÓN: EVIDENCIAS ---
+    elif menu_seleccionado == "Evidencias":
         st.subheader("📸 Buscador Automático de Evidencias en Google Drive")
         if error_excel:
             st.error(f"⚠️ Error cargando datos base: {error_excel}")
@@ -539,7 +568,8 @@ if st.session_state.rol_actual == "Admin":
                     except Exception as e:
                         st.error(f"Error de conexión: {e}")
 
-    with tab_reservas:
+    # --- SECCIÓN: GESTIONAR RESERVAS ---
+    elif menu_seleccionado == "Gestionar Reservas":
         st.subheader(f"Borrador de Reservas Activas ({str_semana})")
         
         columnas_orden = ["ID_Reserva", "Fecha/Hora Registro", "Día", "Fecha_Reserva", "Horario", "Profesor", "Ambientes", "Equipos", "Materiales", "Operario"]
@@ -588,7 +618,8 @@ if st.session_state.rol_actual == "Admin":
         else:
             st.write("No hay registros eliminados en la papelera.")
             
-    with tab_horario:
+    # --- SECCIÓN: EXPORTAR HORARIO ---
+    elif menu_seleccionado == "Exportar Horario":
         st.subheader(f"🖨️ Exportar Horario ({str_semana})")
         
         def obtener_contenido_celda(reserva_df):
@@ -597,8 +628,6 @@ if st.session_state.rol_actual == "Admin":
                 
             profesores_en_bloque = reserva_df["Profesor"].tolist()
             
-            # --- CORRECCIÓN AQUÍ: Validación flexible para unificar la revisión semanal ---
-            # Comprueba que existan los 3 (buscando las palabras clave en lugar del string exacto)
             hay_sujeli = any("SUJELI" in p.upper() for p in profesores_en_bloque)
             hay_jesus = any("JESÚS" in p.upper() or "JESUS" in p.upper() for p in profesores_en_bloque)
             hay_leansy = any("LEANSY" in p.upper() for p in profesores_en_bloque)
@@ -607,7 +636,6 @@ if st.session_state.rol_actual == "Admin":
             
             if es_revision_total:
                 equipos_agrupados = set()
-                # Recoge los equipos solo de las personas que hacen la revisión
                 for _, r in reserva_df.iterrows():
                     if "APOYO" in str(r["Profesor"]).upper() or "REVISIÓN" in str(r["Profesor"]).upper():
                         for eq in str(r["Equipos"]).split(","):
@@ -681,10 +709,8 @@ if st.session_state.rol_actual == "Admin":
                 
                 for idx_row, row_data in enumerate(data):
                     for idx_col, cell_data in enumerate(row_data):
-                        # Pintar de gris si es REVISIÓN SEMANAL o si contiene la palabra APOYO (cualquiera de los ayudantes)
                         if "REVISIÓN SEMANAL" in str(cell_data) or "APOYO" in str(cell_data):
                             t.setStyle(TableStyle([('BACKGROUND', (idx_col, idx_row), (idx_col, idx_row), colors.HexColor("#e0e0e0"))]))
-                        # Pintar amarillo suave si es VISITA
                         elif "VISITA" in str(cell_data):
                             t.setStyle(TableStyle([('BACKGROUND', (idx_col, idx_row), (idx_col, idx_row), colors.HexColor("#fff9c4"))]))
 
@@ -733,7 +759,8 @@ if st.session_state.rol_actual == "Admin":
         
         st.components.v1.html(html_table, height=600, scrolling=True)
 
-    with tab_hacer_reserva:
+    # --- SECCIÓN: HACER RESERVA ---
+    elif menu_seleccionado == "Hacer Reserva":
         st.subheader("🗓️ Separación Semanal de Ambientes y Equipos")
         
         if st.session_state.mostrar_exito:
@@ -784,7 +811,6 @@ if st.session_state.rol_actual == "Admin":
                 docentes_visita = ["Sin profesor designado / Desconocido"] + [p for p in profesores_lista if "REVISIÓN" not in p]
                 docente_encargado = st.selectbox("Profesor o encargado de acompañar la visita", docentes_visita, key=f"encargado_{st.session_state.form_key}")
                 
-                # Se arma un string combinando que es una visita, su motivo y su encargado
                 if motivo_visita:
                     profesores = [f"VISITA: {motivo_visita.upper()} (Encargado: {docente_encargado})"]
                 else:
@@ -804,7 +830,6 @@ if st.session_state.rol_actual == "Admin":
                         fecha_asignada = fechas_semana.get(d, "")
                         st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()} ({fecha_asignada})</div>', unsafe_allow_html=True)
                         
-                        # PRESELECCIÓN AUTOMÁTICA DEL HORARIO PARA APOYOS
                         def_horas = ["09:50 am - 11:00 am"] if tipo_reserva == "🛠️ Revisión de Apoyo" else []
                         h_sel = st.multiselect(f"⏰ Horarios para el {d}:", horas, default=def_horas, key=f"h_admin_{d}_{st.session_state.form_key}")
                         
@@ -939,7 +964,7 @@ if st.session_state.rol_actual == "Admin":
                                         st.error("Error guardando en Google Sheets.")
 
 # ==========================================
-# VISTA 2: DOCENTE NORMAL (CON PESTAÑA PARA BORRAR SUS RESERVAS)
+# VISTA 2: DOCENTE NORMAL
 # ==========================================
 elif st.session_state.rol_actual == "Docente":
 
@@ -950,9 +975,7 @@ elif st.session_state.rol_actual == "Docente":
     
     st.title("🗓️ Separación Semanal de Ambientes y Equipos")
     
-    tab_reservar, tab_mis_reservas = st.tabs(["📝 Hacer Reserva", "🗑️ Mis Reservas"])
-    
-    with tab_reservar:
+    if menu_seleccionado == "Hacer Reserva":
         if st.session_state.mostrar_exito:
             st.balloons()
             st.success("✅ ¡Guardado satisfactoriamente! El formulario se ha reiniciado.")
@@ -1106,7 +1129,7 @@ elif st.session_state.rol_actual == "Docente":
                                 else: 
                                     st.error("Error guardando en Google Sheets.")
 
-    with tab_mis_reservas:
+    elif menu_seleccionado == "Mis Reservas":
         st.subheader(f"🗑️ Anular Mis Reservas Activas ({str_semana})")
         st.write("Si cometió un error o desea cancelar una clase, seleccione la reserva y proceda a anularla. Esta acción liberará el espacio para otros docentes.")
         
