@@ -4,3 +4,4 @@ plotly
 pytz
 requests
 reportlab
+streamlit-option-menu
