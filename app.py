@@ -227,6 +227,19 @@ st.markdown("""
         width: 260px !important;
     }
     
+    /* SOLUCIÓN ESQUINAS BLANCAS: forzamos border-radius a 0 para el menú */
+    iframe[title="streamlit_option_menu.option_menu"] {
+        background-color: transparent !important;
+        border: none !important;
+        border-radius: 0px !important; 
+        outline: none !important;
+    }
+    div.element-container > iframe {
+        background: transparent !important;
+        border: none !important;
+        border-radius: 0px !important;
+    }
+    
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
@@ -359,7 +372,6 @@ with st.sidebar:
                 st.markdown(f'<div class="caja-sesion">👑 Administrador<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             
             if MENU_ACTIVO:
-                # AQUÍ ESTÁ EL TRUCO: background-color: #006b3f igual al sidebar para ocultar el fondo del iframe
                 menu_seleccionado = option_menu(
                     menu_title=None,
                     options=["Hacer Reserva", "Control Visual", "Evidencias", "Gestionar Reservas", "Exportar Horario"],
@@ -368,7 +380,7 @@ with st.sidebar:
                     styles={
                         "container": {"padding": "0!important", "background-color": "#006b3f", "border": "none"},
                         "icon": {"color": "#69f0ae", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d", "border-radius": "5px"},
+                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255, 255, 255, 0.1)", "border-radius": "5px"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
@@ -380,7 +392,6 @@ with st.sidebar:
                 st.markdown(f'<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             
             if MENU_ACTIVO:
-                # AQUÍ ESTÁ EL TRUCO: background-color: #006b3f igual al sidebar para ocultar el fondo del iframe
                 menu_seleccionado = option_menu(
                     menu_title=None,
                     options=["Hacer Reserva", "Mis Reservas"],
@@ -389,7 +400,7 @@ with st.sidebar:
                     styles={
                         "container": {"padding": "0!important", "background-color": "#006b3f", "border": "none"},
                         "icon": {"color": "#69f0ae", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d", "border-radius": "5px"},
+                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255, 255, 255, 0.1)", "border-radius": "5px"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
