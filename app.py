@@ -183,17 +183,18 @@ profesores_lista = [
     "ROJAS ALEJANDRO, FRANCISCO", "GARCIA ARMAS, JUVENAL", "ALTAMIRANO CHUNGA, LUIS", 
     "CACERES GUERRERO, FREDY", "CHEVARRIA MOSCOSO, MARGARITA", "REBAZA PINO, ALFREDO", 
     "ZINGG ROSELL, AUGUSTO", "VASQUEZ CACERES, JAIME", "ORELLANA PARDAVE, JOSE", 
-    "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO", "ADMINISTRACIÓN - NORELLY", "ALATA REY, JOSUÉ ELIEZER",
-    "REVISIÓN - APOYO SUJELI", "REVISIÓN - APOYO JESÚS", "REVISIÓN - APOYO LEANSY"
+    "SALAS PEÑA, CARLO", "RUBIO VALLE, ALEXIS", "YARIN ACHACHAGUA, ANWAR", "SALAS PINTO, DIONISIO", "ADMINISTRACIÓN - NORELLY", "ALATA REY, JOSUÉ ELIEZER"
 ]
-# Separamos a los apoyos con la nueva nomenclatura
 apoyos_lista = ["REVISIÓN - APOYO SUJELI", "REVISIÓN - APOYO JESÚS", "REVISIÓN - APOYO LEANSY"]
 
 def obtener_color_profesor(prof_nombre):
     prof_upper = str(prof_nombre).upper()
     
-    # Cualquier registro de APOYO será de color gris
+    # Color para Apoyos y Revisión Semanal
     if "APOYO" in prof_upper or "REVISIÓN SEMANAL" in prof_upper: return "#e0e0e0"
+    
+    # Color propuesto para Visitas
+    if "VISITA" in prof_upper: return "#fff9c4" 
     
     if "ROJAS" in prof_upper: return "#FFD1DC"          
     if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#B5EAD7" 
@@ -252,7 +253,6 @@ st.markdown("""
         display: inline-block; 
     }
     
-    /* Estilos personalizados para el st.segmented_control simulando la imagen de la píldora morada */
     div[data-testid="stSegmentedControl"] > div {
         background-color: white;
         border: 2px solid #9c27b0;
@@ -681,6 +681,9 @@ if st.session_state.rol_actual == "Admin":
                         # Pintar de gris si es REVISIÓN SEMANAL o si contiene la palabra APOYO (cualquiera de los ayudantes)
                         if "REVISIÓN SEMANAL" in str(cell_data) or "APOYO" in str(cell_data):
                             t.setStyle(TableStyle([('BACKGROUND', (idx_col, idx_row), (idx_col, idx_row), colors.HexColor("#e0e0e0"))]))
+                        # Pintar amarillo suave si es VISITA
+                        elif "VISITA" in str(cell_data):
+                            t.setStyle(TableStyle([('BACKGROUND', (idx_col, idx_row), (idx_col, idx_row), colors.HexColor("#fff9c4"))]))
 
                 elements.append(t)
                 doc.build(elements)
@@ -764,8 +767,7 @@ if st.session_state.rol_actual == "Admin":
             
             st.subheader("📝 Formulario de Registro de Separación")
             
-            # --- USO DE CONTROL SEGMENTADO COMO "PÍLDORA" MORADA ---
-            tipo_reserva = st.segmented_control("Selecciona el propósito de la reserva", ["👨‍🏫 Docente Regular", "🛠️ Revisión de Apoyo"], default="👨‍🏫 Docente Regular")
+            tipo_reserva = st.segmented_control("Selecciona el propósito de la reserva", ["👨‍🏫 Docente Regular", "🛠️ Revisión de Apoyo", "🚶‍♂️ Visita Externa"], default="👨‍🏫 Docente Regular")
             
             if tipo_reserva == "👨‍🏫 Docente Regular":
                 if st.session_state.usuario_actual == "Norelly2026":
@@ -773,6 +775,18 @@ if st.session_state.rol_actual == "Admin":
                 else:
                     st.text_input("Docente Responsable (Autocompletado)", value=st.session_state.nombre_oficial, disabled=True)
                     profesores = [st.session_state.nombre_oficial]
+            
+            elif tipo_reserva == "🚶‍♂️ Visita Externa":
+                motivo_visita = st.text_input("Nombre de la persona, institución o motivo de la visita", key=f"motivo_{st.session_state.form_key}")
+                docentes_visita = ["Sin profesor designado / Desconocido"] + [p for p in profesores_lista if "REVISIÓN" not in p]
+                docente_encargado = st.selectbox("Profesor o encargado de acompañar la visita", docentes_visita, key=f"encargado_{st.session_state.form_key}")
+                
+                # Se arma un string combinando que es una visita, su motivo y su encargado
+                if motivo_visita:
+                    profesores = [f"VISITA: {motivo_visita.upper()} (Encargado: {docente_encargado})"]
+                else:
+                    profesores = [f"VISITA (Encargado: {docente_encargado})"]
+
             else:
                 st.info("💡 Selecciona a los miembros de apoyo. Si los seleccionas a los tres en el mismo horario, en el cuadro final se unificará como 'REVISIÓN SEMANAL' en color gris.")
                 profesores = st.multiselect("Asistentes encargados de la revisión", apoyos_lista, key=f"asistentes_{st.session_state.form_key}")
@@ -786,7 +800,11 @@ if st.session_state.rol_actual == "Admin":
                     for d in dias_sel:
                         fecha_asignada = fechas_semana.get(d, "")
                         st.markdown(f'<div class="bloque-dia"><div class="titulo-dia">🗓️ {d.upper()} ({fecha_asignada})</div>', unsafe_allow_html=True)
-                        h_sel = st.multiselect(f"⏰ Horarios para el {d}:", horas, key=f"h_admin_{d}_{st.session_state.form_key}")
+                        
+                        # PRESELECCIÓN AUTOMÁTICA DEL HORARIO PARA APOYOS
+                        def_horas = ["09:50 am - 11:00 am"] if tipo_reserva == "🛠️ Revisión de Apoyo" else []
+                        h_sel = st.multiselect(f"⏰ Horarios para el {d}:", horas, default=def_horas, key=f"h_admin_{d}_{st.session_state.form_key}")
+                        
                         if h_sel:
                             for h in h_sel:
                                 st.markdown(f'<div class="bloque-hora"><div class="titulo-hora">⏱️ Bloque: {h}</div>', unsafe_allow_html=True)
