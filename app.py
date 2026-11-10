@@ -221,16 +221,19 @@ st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Grand+Hotel&display=swap');
     
-    /* Reducción del ancho del sidebar */
+    /* Panel lateral verde estrecho */
     section[data-testid="stSidebar"] {
         background-color: #006b3f !important;
-        width: 250px !important;
+        width: 260px !important;
     }
     
-    /* ELIMINAR EL CUADRO BLANCO DEL MENÚ */
-    div[data-testid="stVerticalBlock"] > div > div > div.css-1r6slb0, 
-    div.st-emotion-cache-1r6slb0 {
+    /* Eliminación agresiva del fondo blanco detrás del menú de opciones (iframe) */
+    iframe[title="streamlit_option_menu.option_menu"] {
         background-color: transparent !important;
+        border: none !important;
+    }
+    div.element-container > iframe {
+        background: transparent !important;
     }
     
     .block-container {
@@ -241,6 +244,7 @@ st.markdown("""
         max-width: 100% !important;
     }
     
+    /* Estilos generales del sidebar para texto en blanco */
     [data-testid="stSidebar"] .stMarkdown p, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3 { color: white !important; }
     [data-testid="stSidebar"] label p { color: white !important; }
     input { color: black !important; background-color: white !important; }
@@ -364,16 +368,16 @@ with st.sidebar:
                 st.markdown(f'<div class="caja-sesion">👑 Administrador<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             
             if MENU_ACTIVO:
-                # Se eliminó background-color para heredar el verde transparente y color se fijó a blanco
+                # Estilos del menú ajustados para integrarse al fondo verde oscuro
                 menu_seleccionado = option_menu(
                     menu_title=None,
                     options=["Hacer Reserva", "Control Visual", "Evidencias", "Gestionar Reservas", "Exportar Horario"],
                     icons=["calendar-plus", "speedometer2", "camera", "trash", "file-earmark-pdf"],
                     default_index=0,
                     styles={
-                        "container": {"padding": "0px", "background-color": "transparent"},
+                        "container": {"padding": "0!important", "background-color": "transparent"},
                         "icon": {"color": "#69f0ae", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255,255,255,0.1)"},
+                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255, 255, 255, 0.1)"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
@@ -385,21 +389,22 @@ with st.sidebar:
                 st.markdown(f'<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             
             if MENU_ACTIVO:
+                # Estilos del menú ajustados para integrarse al fondo verde oscuro
                 menu_seleccionado = option_menu(
                     menu_title=None,
                     options=["Hacer Reserva", "Mis Reservas"],
                     icons=["calendar-plus", "trash"],
                     default_index=0,
                     styles={
-                        "container": {"padding": "0px", "background-color": "transparent"},
+                        "container": {"padding": "0!important", "background-color": "transparent"},
                         "icon": {"color": "#69f0ae", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "14px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255,255,255,0.1)"},
+                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "rgba(255, 255, 255, 0.1)"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
             
         st.markdown("<br><br>", unsafe_allow_html=True)
-        # Aplicamos un pequeño hack con HTML/CSS para que el botón de cerrar sesión se vea como texto
+        # Hack con HTML/CSS para que el botón de cerrar sesión se vea como texto clickeable
         st.markdown("""<style>div.stButton > button:nth-of-type(1) { background-color: transparent; border: none; color: white; text-decoration: underline; padding-left:0; font-weight:normal; box-shadow:none;} div.stButton > button:nth-of-type(1):hover { color: #69f0ae; background-color: transparent;}</style>""", unsafe_allow_html=True)
         if st.button("Cerrar Sesión"):
             st.session_state.rol_actual = None
