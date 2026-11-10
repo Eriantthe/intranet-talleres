@@ -1,0 +1,28 @@
+name: Enviar Horario PDF Semanal
+
+on:
+  schedule:
+    # 11:50 PM en Lima (UTC-5) es 04:50 AM UTC del viernes. El formato cron es minutos horas dias...
+    - cron: '50 4 * * 5'
+  workflow_dispatch: # Esto habilita un botón para que puedas probarlo a mano cuando quieras
+
+jobs:
+  enviar_pdf:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar el repositorio
+        uses: actions/checkout@v3
+
+      - name: Configurar Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Instalar librerías
+        run: pip install pandas requests reportlab pytz
+
+      - name: Generar y Enviar PDF
+        env:
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASS: ${{ secrets.EMAIL_PASS }}
+        run: python enviar_horario.py
