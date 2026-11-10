@@ -324,7 +324,6 @@ else:
 if not MENU_ACTIVO:
     st.error("⚠️ Falta instalar 'streamlit-option-menu' en tu requirements.txt para usar el nuevo diseño de navegación.")
 
-# Configuración de los botones del menú lateral según el rol
 menu_seleccionado = None
 
 with st.sidebar:
@@ -339,7 +338,6 @@ with st.sidebar:
             else:
                 st.markdown(f'<div class="caja-sesion">👑 Administrador<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             
-            # --- NUEVO MENÚ INTERACTIVO ADMIN ---
             if MENU_ACTIVO:
                 menu_seleccionado = option_menu(
                     menu_title=None,
@@ -347,9 +345,9 @@ with st.sidebar:
                     icons=["calendar-plus", "speedometer2", "camera", "trash", "file-earmark-pdf"],
                     default_index=0,
                     styles={
-                        "container": {"padding": "5px", "background-color": "transparent"},
-                        "icon": {"color": "white", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
+                        "container": {"padding": "5px", "background-color": "#ffffff", "border-radius": "8px"},
+                        "icon": {"color": "#006b3f", "font-size": "18px"}, 
+                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px 0px", "color": "#333333", "--hover-color": "#e8f5e9"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
@@ -360,7 +358,6 @@ with st.sidebar:
             else:
                 st.markdown(f'<div class="caja-sesion">👨‍🏫 Sesión Activa<br><span style="color:#555; font-size:16px;">Ing. {st.session_state.nombre_saludo}</span></div>', unsafe_allow_html=True)
             
-            # --- NUEVO MENÚ INTERACTIVO DOCENTE ---
             if MENU_ACTIVO:
                 menu_seleccionado = option_menu(
                     menu_title=None,
@@ -368,9 +365,9 @@ with st.sidebar:
                     icons=["calendar-plus", "trash"],
                     default_index=0,
                     styles={
-                        "container": {"padding": "5px", "background-color": "transparent"},
-                        "icon": {"color": "white", "font-size": "18px"}, 
-                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"5px 0px", "color": "white", "--hover-color": "#004d2d"},
+                        "container": {"padding": "5px", "background-color": "#ffffff", "border-radius": "8px"},
+                        "icon": {"color": "#006b3f", "font-size": "18px"}, 
+                        "nav-link": {"font-size": "15px", "text-align": "left", "margin":"2px 0px", "color": "#333333", "--hover-color": "#e8f5e9"},
                         "nav-link-selected": {"background-color": "#69f0ae", "color": "#002b12", "font-weight": "bold"},
                     }
                 )
@@ -460,7 +457,6 @@ if st.session_state.rol_actual == "Admin":
     except Exception as e:
         error_excel = e
 
-    # --- SECCIÓN: CONTROL VISUAL ---
     if menu_seleccionado == "Control Visual":
         st.subheader("Estado Analítico e Historial de Maquinaria")
         if error_excel:
@@ -540,7 +536,6 @@ if st.session_state.rol_actual == "Admin":
                     fig.update_layout(yaxis=dict(range=[0, 105], title="Nivel Estimado (%)"))
                 st.plotly_chart(fig, use_container_width=True)
 
-    # --- SECCIÓN: EVIDENCIAS ---
     elif menu_seleccionado == "Evidencias":
         st.subheader("📸 Buscador Automático de Evidencias en Google Drive")
         if error_excel:
@@ -568,7 +563,6 @@ if st.session_state.rol_actual == "Admin":
                     except Exception as e:
                         st.error(f"Error de conexión: {e}")
 
-    # --- SECCIÓN: GESTIONAR RESERVAS ---
     elif menu_seleccionado == "Gestionar Reservas":
         st.subheader(f"Borrador de Reservas Activas ({str_semana})")
         
@@ -618,7 +612,6 @@ if st.session_state.rol_actual == "Admin":
         else:
             st.write("No hay registros eliminados en la papelera.")
             
-    # --- SECCIÓN: EXPORTAR HORARIO ---
     elif menu_seleccionado == "Exportar Horario":
         st.subheader(f"🖨️ Exportar Horario ({str_semana})")
         
@@ -759,7 +752,6 @@ if st.session_state.rol_actual == "Admin":
         
         st.components.v1.html(html_table, height=600, scrolling=True)
 
-    # --- SECCIÓN: HACER RESERVA ---
     elif menu_seleccionado == "Hacer Reserva":
         st.subheader("🗓️ Separación Semanal de Ambientes y Equipos")
         
@@ -964,7 +956,7 @@ if st.session_state.rol_actual == "Admin":
                                         st.error("Error guardando en Google Sheets.")
 
 # ==========================================
-# VISTA 2: DOCENTE NORMAL
+# VISTA 2: DOCENTE NORMAL (CON PESTAÑA PARA BORRAR SUS RESERVAS)
 # ==========================================
 elif st.session_state.rol_actual == "Docente":
 
