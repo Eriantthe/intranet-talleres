@@ -81,7 +81,6 @@ def obtener_contenido_y_color(reserva_df):
                     if eq.strip() and eq.strip() != "(Ninguno)": equipos_agrupados.add(eq.strip())
         return f"<b>REVISIÓN SEMANAL</b><br/><i>Amb:</i> Pool<br/><i>Eq:</i> {', '.join(equipos_agrupados)}", "#e0e0e0"
     else:
-        # Se toma el color del primer profesor para el fondo de la celda
         color_fondo = obtener_color_profesor(reserva_df.iloc[0]["Profesor"])
         textos = []
         for _, r in reserva_df.iterrows():
@@ -101,7 +100,6 @@ styles = getSampleStyleSheet()
 style_title = styles['Title']
 style_title.textColor = colors.HexColor("#006b3f")
 
-# Forzamos que las celdas interpreten HTML básico como <b> y <br/>
 style_cell = ParagraphStyle(
     'CellNormal',
     parent=styles['Normal'],
@@ -122,7 +120,6 @@ style_header = ParagraphStyle(
 elements.append(Paragraph(f"<b>CRONOGRAMA DE USO DE TALLERES Y EQUIPOS - SIMA ({str_semana})</b>", style_title))
 elements.append(Paragraph("<br/>", styles['Normal']))
 
-# Armar cabeceras con fechas
 cabecera = [Paragraph("<b>Hora</b>", style_header)]
 for d in dias:
     cabecera.append(Paragraph(f"<b>{d}</b><br/><font size=7>{fechas_semana[d]}</font>", style_header))
@@ -146,7 +143,6 @@ for idx_row, h in enumerate(horas, start=1):
 
 t = Table(datos_tabla, colWidths=[80, 130, 130, 130, 130, 130])
 
-# Estilo base de la tabla
 estilo_base = [
     ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#006b3f")),
     ('ALIGN', (0,0), (-1,-1), 'CENTER'),
@@ -155,7 +151,6 @@ estilo_base = [
     ('BACKGROUND', (0,1), (0,-1), colors.lightgrey),
 ]
 
-# Unimos el estilo base con los colores dinámicos de cada celda
 t.setStyle(TableStyle(estilo_base + comandos_fondo))
 elements.append(t)
 doc.build(elements)
@@ -169,7 +164,7 @@ msg = EmailMessage()
 msg['Subject'] = f"🚜 Horario SIMA Oficial: {str_semana}"
 msg['From'] = email_user
 msg['To'] = email_user 
-msg.set_content(f"Hola Norelly,\n\nEl horario se ha cerrado por esta semana. Adjunto el PDF oficial generado automáticamente con formato web.\n\nSaludos,\nBot del SIMA")
+msg.set_content(f"Hola Norelly,\n\nEl horario se ha cerrado por esta semana. Adjunto el PDF oficial generado automáticamente.\n\nSaludos,\nBot del SIMA")
 msg.add_attachment(pdf_bytes, maintype='application', subtype='pdf', filename=f"Horario_SIMA_{lunes_obj.strftime('%d_%m')}.pdf")
 
 with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp:
