@@ -39,7 +39,11 @@ horas = ["08:00 am - 09:50 am", "09:50 am - 11:00 am", "11:00 am - 12:50 pm", "0
 
 def obtener_color_profesor(prof_nombre):
     prof_upper = str(prof_nombre).upper()
-    if "APOYO" in prof_upper or "REVISIÓN SEMANAL" in prof_upper: return "#e0e0e0"
+    
+    # CORRECCIÓN AQUÍ: Si contiene "REVISIÓN" o "APOYO", será gris.
+    if "REVISIÓN" in prof_upper or "REVISION" in prof_upper or "APOYO" in prof_upper: 
+        return "#e0e0e0"
+        
     if "VISITA" in prof_upper: return "#fff9c4" 
     if "ROJAS" in prof_upper: return "#FFD1DC"          
     if "GARCIA" in prof_upper or "GARCÍA" in prof_upper: return "#B5EAD7" 
@@ -55,6 +59,7 @@ def obtener_color_profesor(prof_nombre):
     if "YARIN" in prof_upper or "YARÍN" in prof_upper: return "#FFC6FF" 
     if "NORELLY" in prof_upper: return "#FFB703"        
     if "ALATA" in prof_upper: return "#9BF6FF"   
+    
     return "#ffffff"
 
 # 2. DESCARGAR Y FILTRAR DATOS
