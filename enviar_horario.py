@@ -68,9 +68,9 @@ def obtener_contenido_y_color(reserva_df):
     if reserva_df.empty: return None, "#ffffff"
     
     profesores_en_bloque = reserva_df["Profesor"].tolist()
-    hay_sujeli = any("SUJELI" in p.upper() for p in profesores_en_bloque)
-    hay_jesus = any("JESÚS" in p.upper() or "JESUS" in p.upper() for p in profesores_en_bloque)
-    hay_leansy = any("LEANSY" in p.upper() for p in profesores_en_bloque)
+    hay_sujeli = any("SUJELI" in str(p).upper() for p in profesores_en_bloque)
+    hay_jesus = any("JESÚS" in str(p).upper() or "JESUS" in str(p).upper() for p in profesores_en_bloque)
+    hay_leansy = any("LEANSY" in str(p).upper() for p in profesores_en_bloque)
     es_revision_total = (hay_sujeli and hay_jesus and hay_leansy)
     
     if es_revision_total:
